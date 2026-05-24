@@ -128,6 +128,46 @@ class ArtifactRepository:
             )
         return artists
 
+    def search_candidates(self, question: str) -> list[object]:
+        from app.services.artifact_matcher import ArtifactCandidate
+
+        question_text = _clean(question)
+        if question_text is None:
+            return []
+        rows = self._client.fetch_all(
+            """
+            SELECT id, object_id, title_zh, title_en
+            FROM artifacts
+            WHERE object_id IS NOT NULL
+              AND TRIM(object_id) <> ''
+              AND (
+                (title_zh IS NOT NULL AND title_zh <> '' AND %s LIKE CONCAT('%%', title_zh, '%%'))
+                OR
+                (title_en IS NOT NULL AND title_en <> '' AND %s LIKE CONCAT('%%', title_en, '%%'))
+              )
+            ORDER BY id ASC
+            LIMIT 10
+            """,
+            (question_text, question_text),
+        )
+        candidates: list[ArtifactCandidate] = []
+        for row in rows:
+            object_id = _clean(row.get("object_id"))
+            if object_id is None:
+                continue
+            matched_name = _clean(row.get("title_zh")) or _clean(row.get("title_en"))
+            if matched_name is None:
+                continue
+            candidates.append(
+                ArtifactCandidate(
+                    object_id=object_id,
+                    title=matched_name,
+                    matched_name=matched_name,
+                    confidence=0.95 if len(matched_name) >= 4 else 0.75,
+                )
+            )
+        return candidates
+
 
 def _clean(value: object) -> str | None:
     if value is None:
