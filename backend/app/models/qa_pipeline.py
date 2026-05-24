@@ -42,3 +42,4 @@ class QAPipelineContext:
     resolved_object: ResolvedObject | None = None
     retrieval: RetrievalResult | None = None
     generated_answer: GeneratedAnswer | None = None
+    qa_log_row_id: int | None = None

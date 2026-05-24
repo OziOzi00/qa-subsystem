@@ -1,4 +1,5 @@
 import os
+from hashlib import sha256
 from typing import Protocol
 from uuid import UUID, uuid4
 
@@ -12,6 +13,8 @@ class LogRepository(Protocol):
     def insert_log(self, payload: dict[str, object]) -> int: ...
 
     def insert_source(self, qa_log_id: int, source) -> None: ...
+
+    def insert_failed_question(self, payload: dict[str, object]) -> None: ...
 
 
 class QALogger:
@@ -33,6 +36,7 @@ class QALogger:
             row_id = self._repository.insert_log(
                 self._build_log_payload(context, qa_log_id)
             )
+            context.qa_log_row_id = row_id
             if context.retrieval is not None:
                 for source in context.retrieval.sources:
                     self._repository.insert_source(row_id, source)
@@ -41,8 +45,7 @@ class QALogger:
         return qa_log_id
 
     async def record_failed_if_needed(self, context: QAPipelineContext) -> None:
-        """Placeholder for future failed-question persistence."""
-        if context.generated_answer is None:
+        if self._repository is None or context.generated_answer is None:
             return
         if context.generated_answer.status not in {
             AnswerStatus.NO_DATA,
@@ -51,7 +54,10 @@ class QALogger:
             AnswerStatus.ERROR,
         }:
             return
-        # Member 2 will persist these cases into qa_failed_question.
+        try:
+            self._repository.insert_failed_question(self._build_failed_payload(context))
+        except Exception:
+            return
 
     def _build_log_payload(
         self,
@@ -97,6 +103,25 @@ class QALogger:
             "error_message": None,
         }
 
+    def _build_failed_payload(self, context: QAPipelineContext) -> dict[str, object]:
+        retrieval_raw = context.retrieval.raw if context.retrieval else {}
+        return {
+            "qa_log_id": context.qa_log_row_id,
+            "session_id": context.session_id,
+            "user_id": context.user_id,
+            "question": context.question,
+            "normalized_question": context.question,
+            "question_hash": sha256(context.question.encode("utf-8")).hexdigest(),
+            "intent": context.intent.intent if context.intent else None,
+            "failure_type": _failure_type(context),
+            "artifact_id": _artifact_id_from_raw(retrieval_raw),
+            "object_id": (
+                context.resolved_object.object_id if context.resolved_object else None
+            ),
+            "error_detail": retrieval_raw.get("reason"),
+            "status": "open",
+        }
+
 
 def _artifact_id_from_raw(raw: dict[str, object]) -> int | None:
     artifact_id = raw.get("artifactId")
@@ -106,6 +131,23 @@ def _artifact_id_from_raw(raw: dict[str, object]) -> int | None:
         return int(artifact_id)
     except (TypeError, ValueError):
         return None
+
+
+def _failure_type(context: QAPipelineContext) -> str:
+    status = (
+        context.generated_answer.status
+        if context.generated_answer
+        else AnswerStatus.ERROR
+    )
+    if status == AnswerStatus.NO_DATA:
+        return "no_data"
+    if status == AnswerStatus.NEED_CLARIFICATION:
+        return "need_clarification"
+    if status == AnswerStatus.UNSUPPORTED:
+        return "unsupported"
+    if context.retrieval is not None and context.retrieval.status == AnswerStatus.ERROR:
+        return "retrieval_error"
+    return "generation_error"
 
 
 def _build_default_logger() -> QALogger:

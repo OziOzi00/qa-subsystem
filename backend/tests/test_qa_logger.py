@@ -10,6 +10,7 @@ class FakeLogRepository:
     def __init__(self) -> None:
         self.log_payloads: list[dict[str, object]] = []
         self.source_payloads: list[tuple[int, AnswerSource]] = []
+        self.failed_payloads: list[dict[str, object]] = []
 
     def insert_log(self, payload: dict[str, object]) -> int:
         self.log_payloads.append(payload)
@@ -17,6 +18,9 @@ class FakeLogRepository:
 
     def insert_source(self, qa_log_id: int, source: AnswerSource) -> None:
         self.source_payloads.append((qa_log_id, source))
+
+    def insert_failed_question(self, payload: dict[str, object]) -> None:
+        self.failed_payloads.append(payload)
 
 
 class FailingLogRepository(FakeLogRepository):
@@ -95,3 +99,45 @@ def test_record_returns_uuid_when_repository_fails() -> None:
     qa_log_uuid = asyncio.run(logger.record(_context()))
 
     assert isinstance(qa_log_uuid, UUID)
+
+
+def test_record_failed_if_needed_persists_no_data_failure() -> None:
+    repository = FakeLogRepository()
+    logger = QALogger(repository=repository)
+    context = _context(status=AnswerStatus.NO_DATA)
+    context.retrieval.raw = {"reason": "mysql_fact_missing"}
+
+    asyncio.run(logger.record(context))
+    asyncio.run(logger.record_failed_if_needed(context))
+
+    assert repository.failed_payloads == [
+        {
+            "qa_log_id": 99,
+            "session_id": "session-1",
+            "user_id": 1001,
+            "question": "它是什么材质？",
+            "normalized_question": "它是什么材质？",
+            "question_hash": repository.failed_payloads[0]["question_hash"],
+            "intent": "artifact_material",
+            "failure_type": "no_data",
+            "artifact_id": None,
+            "object_id": "MET_123",
+            "error_detail": "mysql_fact_missing",
+            "status": "open",
+        }
+    ]
+    assert len(str(repository.failed_payloads[0]["question_hash"])) == 64
+
+
+def test_record_failed_if_needed_maps_error_to_retrieval_error() -> None:
+    repository = FakeLogRepository()
+    logger = QALogger(repository=repository)
+    context = _context(status=AnswerStatus.ERROR)
+    context.retrieval.status = AnswerStatus.ERROR
+    context.retrieval.raw = {"reason": "mysql_timeout"}
+
+    asyncio.run(logger.record(context))
+    asyncio.run(logger.record_failed_if_needed(context))
+
+    assert repository.failed_payloads[0]["failure_type"] == "retrieval_error"
+    assert repository.failed_payloads[0]["error_detail"] == "mysql_timeout"

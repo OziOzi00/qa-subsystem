@@ -110,6 +110,43 @@ class QALogRepository:
             ),
         )
 
+    def insert_failed_question(self, payload: dict[str, object]) -> None:
+        self._client.execute(
+            """
+            INSERT INTO qa_failed_question (
+                qa_log_id,
+                session_id,
+                user_id,
+                question,
+                normalized_question,
+                question_hash,
+                intent,
+                failure_type,
+                artifact_id,
+                object_id,
+                error_detail,
+                status
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s
+            )
+            """,
+            (
+                payload.get("qa_log_id"),
+                payload.get("session_id"),
+                payload.get("user_id"),
+                payload["question"],
+                payload.get("normalized_question"),
+                payload.get("question_hash"),
+                payload.get("intent"),
+                payload["failure_type"],
+                payload.get("artifact_id"),
+                payload.get("object_id"),
+                payload.get("error_detail"),
+                payload.get("status", "open"),
+            ),
+        )
+
 
 def _json_or_none(value: object) -> str | None:
     if value is None:
