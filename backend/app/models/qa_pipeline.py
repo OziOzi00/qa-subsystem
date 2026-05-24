@@ -9,6 +9,7 @@ class IntentResult:
     intent: str
     confidence: float
     matched_keywords: list[str] = field(default_factory=list)
+    entities: dict[str, Any] = field(default_factory=dict)
     needs_object: bool = True
 
 
