@@ -69,7 +69,7 @@
 
 ## 7. 统计博物馆文物数量（intent: statistics_count）
 
-输入：博物馆名称（来自 intent.entities["museum"] 或回退 object_id）
+输入：博物馆名称（来自 intent.entities["museum"]，若缺少则返回无数据）
 
     MATCH (m:Museum)-[:COLLECTED_BY]-(a:Artifact)
     WHERE m.name CONTAINS $name
@@ -79,7 +79,7 @@
 
 ## 8. 收藏某类型最多的博物馆（intent: statistics_top_museum）
 
-输入：文物类型（来自 intent.entities["artifact_type"] 或回退 object_id）
+输入：文物类型（来自 intent.entities["artifact_type"]，若缺少则返回无数据）
 
     MATCH (a:Artifact {type: $type})-[:COLLECTED_BY]->(m:Museum)
     RETURN m.name AS museum, m.city AS city, count(a) AS cnt

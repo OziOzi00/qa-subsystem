@@ -38,13 +38,13 @@
 
 ### 7. `_query_statistics_count(object_id: Optional[str], intent: IntentResult) -> Optional[RetrievalResult]`
 - 意图：`statistics_count`
-- 输入：博物馆名（从 intent.entities["museum"] 读取，若空则用 object_id）
+- 输入：博物馆名（从 intent.entities["museum"] 读取，若缺少则返回 None）
 - 功能：统计某博物馆收藏文物总数
 - 输出：`"博物馆 {name} 收藏了 {count} 件文物"`
 
 ### 8. `_query_top_museum_by_type(object_id: Optional[str], intent: IntentResult) -> Optional[RetrievalResult]`
 - 意图：`statistics_top_museum`
-- 输入：文物类型（从 intent.entities["artifact_type"] 读取，若空则用 object_id）
+- 输入：文物类型（从 intent.entities["artifact_type"] 读取，若缺少则返回 None）
 - 功能：查找收藏该类型文物最多的博物馆
 - 输出：`"收藏 {type} 最多的博物馆是 {museum}（{city}），共 {cnt} 件"`
 
@@ -69,5 +69,5 @@
 ## 协作说明
 
 - 成员4需在识别 `statistics_count`、`statistics_top_museum`、`museum_city` 意图时，将抽取的博物馆名或类型名填入 `IntentResult.entities`，键名分别为 `"museum"` 和 `"artifact_type"`。
-- 若成员4未填充，代码会回退使用 `object_id`（仅测试阶段），上线后应保证 entities 非空。
+- 若成员4未填充必要实体，查询将返回无数据（NO_DATA）。成员4需保证在 statistics_count、statistics_top_museum 意图中正确填充 entities。
 - 所有无数据情况返回 `AnswerStatus.NO_DATA`，前端展示“暂无相关数据”，不编造答案。

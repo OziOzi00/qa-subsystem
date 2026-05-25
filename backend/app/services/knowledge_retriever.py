@@ -7,7 +7,7 @@
 - 支持统计类复杂问答：博物馆文物数量、某类型最多的博物馆
 - 支持多跳关系问答：博物馆城市、同博物馆同朝代文物
 - 无数据时返回 None/空列表，最终转为 NO_DATA
-- 优先使用 intent.entities 中的实体，回退使用 object_id（临时兼容）
+- 优先使用 intent.entities 中的实体，无法获取时返回 None（由上层转为 NO_DATA）
 """
 
 import logging
@@ -75,7 +75,7 @@ class KnowledgeRetriever:
         object_id = resolved_object.object_id
 
         # 2. 演示文物走 mock 数据（用于前端联调）
-        if object_id in ("DEMO_001", "DEMO_002"):
+        if object_id in ("DEMO_001"):
             return self._retrieve_demo(intent)
 
         # 3. 真实查询（Neo4j 相关意图）
@@ -365,15 +365,13 @@ class KnowledgeRetriever:
     def _query_statistics_count(self, object_id: Optional[str], intent: IntentResult) -> Optional[RetrievalResult]:
         """
         统计类问答：某博物馆收藏文物数量。
-        优先从 intent.entities 中获取博物馆名（成员4填充），
-        若没有则回退使用 object_id（仅用于开发测试）。
+        必须从 intent.entities 中获取博物馆名（成员4填充），缺少则返回 None。
         """
         museum_name = None
         if hasattr(intent, 'entities') and intent.entities:
-            museum_name = intent.entities.get('museum') or intent.entities.get('organization')
+            museum_name = intent.entities.get('museum')   # 只使用约定的键名 "museum"
         if not museum_name:
-            museum_name = object_id
-        if not museum_name:
+            # 缺少博物馆名，无法回答
             return None
 
         cypher = """
@@ -403,13 +401,11 @@ class KnowledgeRetriever:
     def _query_top_museum_by_type(self, object_id: Optional[str], intent: IntentResult) -> Optional[RetrievalResult]:
         """
         收藏某类型文物最多的博物馆及所在城市。
-        优先从 intent.entities 中获取类型名，若没有则回退使用 object_id。
+        必须从 intent.entities 中获取类型名（成员4填充），缺少则返回 None。
         """
         artifact_type = None
         if hasattr(intent, 'entities') and intent.entities:
-            artifact_type = intent.entities.get('artifact_type') or intent.entities.get('type')
-        if not artifact_type:
-            artifact_type = object_id
+            artifact_type = intent.entities.get('artifact_type')   # 只使用约定的键名 "artifact_type"
         if not artifact_type:
             return None
 
@@ -557,7 +553,7 @@ class KnowledgeRetriever:
 
     # =================== Demo 模式（用于联调） ===================
     def _retrieve_demo(self, intent: IntentResult) -> RetrievalResult:
-        """演示数据，仅供 DEMO_001/002 使用"""
+        """演示数据，仅供 DEMO_001 使用"""
         base_source = AnswerSource(
             sourceType=SourceType.TEMPLATE,
             sourceName="QA Demo Dataset",
