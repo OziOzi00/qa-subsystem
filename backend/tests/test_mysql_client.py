@@ -1,4 +1,4 @@
-from app.db.mysql import MySQLClient, MySQLConfig
+from app.db.mysql import MySQLClient, MySQLConfig, get_mysql_dsn
 
 
 class FakeCursor:
@@ -53,6 +53,25 @@ def test_mysql_config_parses_pymysql_dsn() -> None:
     assert config.password == "secret"
     assert config.database == "seitem"
     assert config.charset == "utf8mb4"
+
+
+def test_get_mysql_dsn_prefers_environment(monkeypatch, tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("MYSQL_DSN=mysql+pymysql://file:pw@localhost/db\n")
+    monkeypatch.setenv("MYSQL_DSN", "mysql+pymysql://env:pw@localhost/db")
+
+    assert get_mysql_dsn([env_file]) == "mysql+pymysql://env:pw@localhost/db"
+
+
+def test_get_mysql_dsn_reads_env_file_when_environment_missing(monkeypatch, tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "PROJECT_NAME=Knowledge QA Subsystem\n"
+        "MYSQL_DSN=mysql+pymysql://file:pw@localhost:3307/seitem\n"
+    )
+    monkeypatch.delenv("MYSQL_DSN", raising=False)
+
+    assert get_mysql_dsn([env_file]) == "mysql+pymysql://file:pw@localhost:3307/seitem"
 
 
 def test_mysql_client_fetch_and_execute_use_connection_factory() -> None:

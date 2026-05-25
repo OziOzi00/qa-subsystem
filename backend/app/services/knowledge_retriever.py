@@ -1,7 +1,5 @@
-import os
-
 from app.models.qa_pipeline import IntentResult, RetrievalResult
-from app.db.mysql import MySQLClient, MySQLConfig
+from app.db.mysql import MySQLClient, MySQLConfig, get_mysql_dsn
 from app.repositories.mysql.artifact_repository import ArtifactDetail, ArtifactRepository
 from app.schemas.qa import (
     AnswerSource,
@@ -213,7 +211,7 @@ _MYSQL_FACT_RENDERERS = {
 
 
 def _build_default_retriever() -> KnowledgeRetriever:
-    mysql_dsn = os.getenv("MYSQL_DSN")
+    mysql_dsn = get_mysql_dsn()
     if not mysql_dsn:
         return KnowledgeRetriever()
     try:

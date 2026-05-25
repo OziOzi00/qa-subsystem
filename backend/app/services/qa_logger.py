@@ -1,10 +1,9 @@
-import os
 from hashlib import sha256
 from typing import Protocol
 from uuid import UUID, uuid4
 
 from app.models.qa_pipeline import QAPipelineContext
-from app.db.mysql import MySQLClient, MySQLConfig
+from app.db.mysql import MySQLClient, MySQLConfig, get_mysql_dsn
 from app.repositories.mysql.qa_log_repository import QALogRepository
 from app.schemas.qa import AnswerStatus
 
@@ -151,7 +150,7 @@ def _failure_type(context: QAPipelineContext) -> str:
 
 
 def _build_default_logger() -> QALogger:
-    mysql_dsn = os.getenv("MYSQL_DSN")
+    mysql_dsn = get_mysql_dsn()
     if not mysql_dsn:
         return QALogger()
     try:

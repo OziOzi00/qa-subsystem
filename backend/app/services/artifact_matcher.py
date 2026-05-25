@@ -1,8 +1,7 @@
 from dataclasses import dataclass
-import os
 from typing import Protocol
 
-from app.db.mysql import MySQLClient, MySQLConfig
+from app.db.mysql import MySQLClient, MySQLConfig, get_mysql_dsn
 from app.repositories.mysql.artifact_repository import ArtifactRepository
 
 
@@ -101,7 +100,7 @@ class ArtifactMatcher:
 
 
 def _build_default_matcher() -> ArtifactMatcher:
-    mysql_dsn = os.getenv("MYSQL_DSN")
+    mysql_dsn = get_mysql_dsn()
     if not mysql_dsn:
         return ArtifactMatcher()
     try:

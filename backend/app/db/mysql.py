@@ -1,5 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+import os
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -34,6 +36,34 @@ class MySQLConfig:
 
 
 ConnectionFactory = Callable[[MySQLConfig], Any]
+
+
+def get_mysql_dsn(env_file_paths: list[Path] | None = None) -> str | None:
+    env_value = os.getenv("MYSQL_DSN")
+    if env_value:
+        return env_value
+
+    paths = env_file_paths or [
+        Path.cwd() / ".env",
+        Path.cwd() / "backend" / ".env",
+    ]
+    for path in paths:
+        if not path.exists():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                continue
+            key, value = stripped.split("=", 1)
+            if key.strip() == "MYSQL_DSN":
+                return _unquote_env_value(value.strip())
+    return None
+
+
+def _unquote_env_value(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        return value[1:-1]
+    return value
 
 
 def _pymysql_connection_factory(config: MySQLConfig) -> Any:
