@@ -10,7 +10,7 @@ class IntentResult:
     confidence: float
     matched_keywords: list[str] = field(default_factory=list)
     needs_object: bool = True
-
+    entities: dict[str, str] = field(default_factory=dict)   # 新增：存放抽取的实体，如 {"museum": "大英博物馆"}
 
 @dataclass(slots=True)
 class RetrievalResult:
