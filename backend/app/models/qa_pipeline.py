@@ -10,6 +10,8 @@ class IntentResult:
     confidence: float
     matched_keywords: list[str] = field(default_factory=list)
     needs_object: bool = True
+    # 兼容成员3的扩展：传递识别出的实体字典（例如 museum, artifact_type, artifact_name）
+    entities: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
