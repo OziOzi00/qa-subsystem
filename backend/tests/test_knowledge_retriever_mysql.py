@@ -97,3 +97,41 @@ def test_retrieve_without_repository_keeps_demo_dataset_available() -> None:
 
     assert result.status == AnswerStatus.ANSWERED
     assert result.facts == ["演示文物 DEMO_001 的材质为 porcelain。"]
+
+
+def test_graph_intent_falls_back_to_mysql_when_neo4j_unavailable() -> None:
+    repository = FakeArtifactRepository(_artifact())
+    retriever = KnowledgeRetriever(artifact_repository=repository)
+    retriever.neo4j_driver = None
+
+    result = retriever.retrieve(
+        intent=IntentResult(intent="artifact_museum", confidence=0.75),
+        resolved_object=ResolvedObject(
+            objectId="MET_123",
+            title=None,
+            resolveSource="request_object_id",
+        ),
+        question="Where is it collected?",
+    )
+
+    assert result.status == AnswerStatus.ANSWERED
+    assert result.sources[0].source_type == SourceType.MYSQL
+    assert "British Museum" in result.facts[0]
+
+
+def test_graph_intent_without_databases_returns_neo4j_not_configured() -> None:
+    retriever = KnowledgeRetriever()
+    retriever.neo4j_driver = None
+
+    result = retriever.retrieve(
+        intent=IntentResult(intent="related_artifacts", confidence=0.75),
+        resolved_object=ResolvedObject(
+            objectId="MET_123",
+            title=None,
+            resolveSource="request_object_id",
+        ),
+        question="Recommend related artifacts.",
+    )
+
+    assert result.status == AnswerStatus.NO_DATA
+    assert result.raw["reason"] == "neo4j_not_configured"
