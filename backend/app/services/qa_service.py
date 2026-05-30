@@ -51,6 +51,13 @@ class QAService:
                 request.session_id or request.conversation_id,
                 context.resolved_object,
             )
+        session_context_store.append_turn(
+            request.session_id or request.conversation_id,
+            question=context.question,
+            intent=context.intent.intent if context.intent else None,
+            resolved_object=context.resolved_object,
+            status=context.generated_answer.status.value if context.generated_answer else None,
+        )
 
         return self._build_response(request, context, qa_log_id)
 
@@ -89,7 +96,11 @@ class QAService:
             debug={
                 "intentConfidence": intent.confidence,
                 "matchedKeywords": intent.matched_keywords,
+                "entities": intent.entities,
                 "retrievalRaw": retrieval.raw,
+                "recentContext": session_context_store.get_recent_turns(
+                    request.session_id or request.conversation_id
+                ),
             },
         )
 
