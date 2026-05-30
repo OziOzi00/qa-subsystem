@@ -1,4 +1,6 @@
 from app.models.qa_pipeline import IntentResult, RetrievalResult
+from app.db.mysql import MySQLClient, MySQLConfig, get_mysql_dsn
+from app.repositories.mysql.artifact_repository import ArtifactDetail, ArtifactRepository
 from app.schemas.qa import (
     AnswerSource,
     AnswerStatus,
@@ -16,6 +18,9 @@ class KnowledgeRetriever:
     MySQL and Neo4j implementations.
     """
 
+    def __init__(self, artifact_repository: ArtifactRepository | None = None) -> None:
+        self._artifact_repository = artifact_repository
+
     def retrieve(
         self,
         intent: IntentResult,
@@ -31,6 +36,11 @@ class KnowledgeRetriever:
         if resolved_object.object_id == "DEMO_001":
             return self._retrieve_demo(intent)
 
+        if self._artifact_repository is not None and resolved_object.object_id:
+            mysql_result = self._retrieve_mysql(intent, resolved_object.object_id)
+            if mysql_result is not None:
+                return mysql_result
+
         if not intent.needs_object and intent.intent.startswith("statistics"):
             return RetrievalResult(
                 status=AnswerStatus.NO_DATA,
@@ -42,6 +52,53 @@ class KnowledgeRetriever:
             status=AnswerStatus.NO_DATA,
             facts=[],
             raw={"reason": "database_not_connected"},
+        )
+
+    def _retrieve_mysql(
+        self,
+        intent: IntentResult,
+        object_id: str,
+    ) -> RetrievalResult | None:
+        if intent.intent not in _MYSQL_FACT_RENDERERS:
+            return None
+
+        artifact = self._artifact_repository.find_by_object_id(object_id)
+        if artifact is None:
+            return RetrievalResult(
+                status=AnswerStatus.NO_DATA,
+                facts=[],
+                raw={"reason": "mysql_artifact_not_found", "objectId": object_id},
+            )
+
+        fact = _MYSQL_FACT_RENDERERS[intent.intent](artifact)
+        if fact is None:
+            return RetrievalResult(
+                status=AnswerStatus.NO_DATA,
+                facts=[],
+                raw={
+                    "reason": "mysql_fact_missing",
+                    "artifactId": artifact.id,
+                    "objectId": artifact.object_id,
+                    "intent": intent.intent,
+                },
+            )
+
+        source = AnswerSource(
+            sourceType=SourceType.MYSQL,
+            sourceName="公共 MySQL 文物基础表",
+            detailUrl=artifact.detail_url,
+            factText=fact,
+            confidence=0.9,
+        )
+        return RetrievalResult(
+            status=AnswerStatus.ANSWERED,
+            facts=[fact],
+            sources=[source],
+            raw={
+                "dataset": "mysql",
+                "artifactId": artifact.id,
+                "objectId": artifact.object_id,
+            },
         )
 
     def _retrieve_demo(self, intent: IntentResult) -> RetrievalResult:
@@ -94,4 +151,74 @@ class KnowledgeRetriever:
         )
 
 
-knowledge_retriever = KnowledgeRetriever()
+def _render_material(artifact: ArtifactDetail) -> str | None:
+    if artifact.material is None:
+        return None
+    return f"{artifact.title}的材质为 {artifact.material}。"
+
+
+def _render_type(artifact: ArtifactDetail) -> str | None:
+    if artifact.type is None:
+        return None
+    return f"{artifact.title}的类型为 {artifact.type}。"
+
+
+def _render_description(artifact: ArtifactDetail) -> str | None:
+    if artifact.description is None:
+        return None
+    return artifact.description
+
+
+def _render_dimensions(artifact: ArtifactDetail) -> str | None:
+    if artifact.dimensions is None:
+        return None
+    return f"{artifact.title}的尺寸与规格为 {artifact.dimensions}。"
+
+
+def _render_museum(artifact: ArtifactDetail) -> str | None:
+    if artifact.museum_name is None:
+        return None
+    location = "，".join(
+        part for part in [artifact.museum_city, artifact.museum_country] if part
+    )
+    suffix = f"（{location}）" if location else ""
+    return f"{artifact.title}现藏于{artifact.museum_name}{suffix}。"
+
+
+def _render_period(artifact: ArtifactDetail) -> str | None:
+    period = artifact.dynasty_name or artifact.time_period
+    if period is None:
+        return None
+    return f"{artifact.title}的年代为 {period}。"
+
+
+def _render_artist_biography(artifact: ArtifactDetail) -> str | None:
+    for artist in artifact.artists:
+        if artist.biography:
+            return f"{artist.name}的生平信息：{artist.biography}"
+    return None
+
+
+_MYSQL_FACT_RENDERERS = {
+    "artifact_material": _render_material,
+    "artifact_type": _render_type,
+    "artifact_description": _render_description,
+    "artifact_dimensions": _render_dimensions,
+    "artifact_museum": _render_museum,
+    "artifact_period": _render_period,
+    "artist_biography": _render_artist_biography,
+}
+
+
+def _build_default_retriever() -> KnowledgeRetriever:
+    mysql_dsn = get_mysql_dsn()
+    if not mysql_dsn:
+        return KnowledgeRetriever()
+    try:
+        client = MySQLClient(MySQLConfig.from_dsn(mysql_dsn))
+    except ValueError:
+        return KnowledgeRetriever()
+    return KnowledgeRetriever(artifact_repository=ArtifactRepository(client))
+
+
+knowledge_retriever = _build_default_retriever()

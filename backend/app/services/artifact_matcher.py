@@ -1,4 +1,8 @@
 from dataclasses import dataclass
+from typing import Protocol
+
+from app.db.mysql import MySQLClient, MySQLConfig, get_mysql_dsn
+from app.repositories.mysql.artifact_repository import ArtifactRepository
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,6 +19,10 @@ class ArtifactCandidate:
             "matchedName": self.matched_name,
             "confidence": self.confidence,
         }
+
+
+class CandidateRepository(Protocol):
+    def search_candidates(self, question: str) -> list[ArtifactCandidate]: ...
 
 
 class ArtifactMatcher:
@@ -38,7 +46,24 @@ class ArtifactMatcher:
         },
     )
 
+    def __init__(self, candidate_repository: CandidateRepository | None = None) -> None:
+        self._candidate_repository = candidate_repository
+
     def match(self, question: str) -> list[ArtifactCandidate]:
+        if self._candidate_repository is not None:
+            try:
+                return self._deduplicate(
+                    [
+                        candidate
+                        for candidate in self._candidate_repository.search_candidates(
+                            question
+                        )
+                        if candidate.object_id.strip()
+                    ]
+                )
+            except Exception:
+                return []
+
         candidates: list[ArtifactCandidate] = []
         for item in self._demo_catalog:
             aliases = item["aliases"]
@@ -74,4 +99,15 @@ class ArtifactMatcher:
         return list(best_by_object_id.values())
 
 
-artifact_matcher = ArtifactMatcher()
+def _build_default_matcher() -> ArtifactMatcher:
+    mysql_dsn = get_mysql_dsn()
+    if not mysql_dsn:
+        return ArtifactMatcher()
+    try:
+        client = MySQLClient(MySQLConfig.from_dsn(mysql_dsn))
+    except ValueError:
+        return ArtifactMatcher()
+    return ArtifactMatcher(candidate_repository=ArtifactRepository(client))
+
+
+artifact_matcher = _build_default_matcher()
