@@ -18,6 +18,24 @@ Open:
 - API docs: http://127.0.0.1:8000/docs
 - Health check: http://127.0.0.1:8000/api/health
 
+Environment setup details are in `docs/development/environment-setup.md`.
+Do not commit real database passwords in `.env` or documentation.
+
+## Smoke Test
+
+After the backend server is running:
+
+```powershell
+python ..\scripts\smoke_test_backend.py --base-url http://127.0.0.1:8000
+```
+
+If `MYSQL_DSN` is configured and the public database contains all `qa_` tables,
+run the DB-backed checks:
+
+```powershell
+python ..\scripts\smoke_test_backend.py --base-url http://127.0.0.1:8000 --include-db
+```
+
 ## Demo QA Request
 
 ```powershell
@@ -25,12 +43,11 @@ Invoke-RestMethod `
   -Uri http://127.0.0.1:8000/api/qa/ask `
   -Method Post `
   -ContentType 'application/json' `
-  -Body '{"question":"这件文物收藏在哪里？","objectId":"DEMO_001","sourceClient":"demo"}'
+  -Body '{"question":"演示文物的材质是什么？","objectId":"DEMO_001","sourceClient":"demo"}'
 ```
 
-The current service is a scaffold. It returns mock data for `DEMO_001` and
-keeps a stable API shape for later MySQL, Neo4j, intent recognition, answer
-generation, and logging modules.
+The service returns demo data for `DEMO_001`, and real MySQL / Neo4j-backed
+answers when the corresponding environment variables are configured.
 
 ## QA Pipeline Modules
 
