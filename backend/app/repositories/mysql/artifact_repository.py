@@ -168,6 +168,71 @@ class ArtifactRepository:
             )
         return candidates
 
+    def find_related_by_type(
+        self,
+        object_id: str,
+        artifact_type: str | None,
+        limit: int = 5,
+    ) -> list[ArtifactDetail]:
+        normalized_object_id = _clean(object_id)
+        normalized_type = _clean(artifact_type)
+        if normalized_object_id is None or normalized_type is None:
+            return []
+
+        rows = self._client.fetch_all(
+            """
+            SELECT
+                a.id,
+                a.object_id,
+                a.title_zh,
+                a.title_en,
+                a.time_period,
+                d.name_zh AS dynasty_name_zh,
+                a.type,
+                a.material,
+                a.description,
+                a.dimensions,
+                m.name AS museum_name,
+                m.country AS museum_country,
+                m.city AS museum_city,
+                a.detail_url,
+                a.image_url
+            FROM artifacts a
+            LEFT JOIN dynasties d ON d.id = a.dynasty_id
+            LEFT JOIN museums m ON m.id = a.museum_id
+            WHERE a.object_id <> %s
+              AND a.object_id IS NOT NULL
+              AND TRIM(a.object_id) <> ''
+              AND a.type = %s
+            ORDER BY a.id ASC
+            LIMIT %s
+            """,
+            (normalized_object_id, normalized_type, limit),
+        )
+        return [self._detail_from_row(row) for row in rows]
+
+    def _detail_from_row(self, row: dict[str, object]) -> ArtifactDetail:
+        normalized_object_id = _clean(row.get("object_id")) or str(row["id"])
+        title = _clean(row.get("title_zh")) or _clean(row.get("title_en")) or normalized_object_id
+        return ArtifactDetail(
+            id=int(row["id"]),
+            object_id=normalized_object_id,
+            title=title,
+            title_en=_clean(row.get("title_en")),
+            time_period=_clean(row.get("time_period")),
+            dynasty_name=_clean(row.get("dynasty_name_zh")),
+            type=_clean(row.get("type")),
+            material=_clean(row.get("material")),
+            description=_clean(row.get("description")),
+            dimensions=_clean(row.get("dimensions")),
+            museum_name=_clean(row.get("museum_name")),
+            museum_country=_clean(row.get("museum_country")),
+            museum_city=_clean(row.get("museum_city")),
+            detail_url=_clean(row.get("detail_url")),
+            image_url=_clean(row.get("image_url")),
+            artists=[],
+        )
+
 
 def _clean(value: object) -> str | None:
     if value is None:

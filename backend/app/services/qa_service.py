@@ -42,6 +42,7 @@ class QAService:
             intent=context.intent,
             resolved_object=context.resolved_object,
             retrieval=context.retrieval,
+            question=context.question,
         )
 
         qa_log_id = await qa_logger.record(context)

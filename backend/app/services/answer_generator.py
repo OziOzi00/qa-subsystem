@@ -1,9 +1,29 @@
+from typing import Protocol
+
 from app.models.qa_pipeline import GeneratedAnswer, IntentResult, RetrievalResult
-from app.schemas.qa import AnswerStatus, ResolvedObject
+from app.schemas.qa import AnswerSource, AnswerStatus, ResolvedObject, SourceType
+from app.services.llm_client import llm_client
+
+
+class SupplementGenerator(Protocol):
+    @property
+    def is_configured(self) -> bool: ...
+
+    def generate_supplement(
+        self,
+        *,
+        question: str,
+        intent: IntentResult,
+        resolved_object: ResolvedObject,
+        retrieval: RetrievalResult,
+    ): ...
 
 
 class AnswerGenerator:
     """Generate user-facing answers from retrieved facts and templates."""
+
+    def __init__(self, supplement_generator: SupplementGenerator | None = None) -> None:
+        self._supplement_generator = supplement_generator
 
     _unsupported_answer = (
         "当前问题暂未匹配到已支持的文物问答类型。"
@@ -32,6 +52,7 @@ class AnswerGenerator:
         intent: IntentResult,
         resolved_object: ResolvedObject,
         retrieval: RetrievalResult,
+        question: str = "",
     ) -> GeneratedAnswer:
         if retrieval.status == AnswerStatus.NEED_CLARIFICATION:
             return self._clarification_answer(resolved_object)
@@ -50,14 +71,50 @@ class AnswerGenerator:
 
         fact_content = "\n".join(retrieval.facts) if retrieval.facts else None
         answer = self._render_template(resolved_object, retrieval)
+        supplemental_content = self._generate_supplemental_content(
+            question=question,
+            intent=intent,
+            resolved_object=resolved_object,
+            retrieval=retrieval,
+        )
         return GeneratedAnswer(
             status=AnswerStatus.ANSWERED,
             answer=answer,
             fact_content=fact_content,
-            supplemental_content=(
-                "该回答由系统根据 MySQL 或 Neo4j 中的已确认事实生成；"
-                "如后续接入大语言模型，补充性描述会在此字段中单独标注。"
-            ),
+            supplemental_content=supplemental_content,
+        )
+
+    def _generate_supplemental_content(
+        self,
+        *,
+        question: str,
+        intent: IntentResult,
+        resolved_object: ResolvedObject,
+        retrieval: RetrievalResult,
+    ) -> str:
+        generator = self._supplement_generator
+        if generator is not None and generator.is_configured:
+            result = generator.generate_supplement(
+                question=question,
+                intent=intent,
+                resolved_object=resolved_object,
+                retrieval=retrieval,
+            )
+            if result is not None:
+                retrieval.sources.append(
+                    AnswerSource(
+                        sourceType=SourceType.LLM,
+                        sourceName=f"大语言模型补充生成：{result.model}",
+                        detailUrl=None,
+                        factText=result.content,
+                        confidence=0.6,
+                    )
+                )
+                return result.content
+
+        return (
+            "该回答由系统根据 MySQL 或 Neo4j 中的已确认事实生成；"
+            "当前未启用大语言模型补充生成，已使用模板兜底。"
         )
 
     def _clarification_answer(self, resolved_object: ResolvedObject) -> GeneratedAnswer:
@@ -92,4 +149,4 @@ class AnswerGenerator:
         return "暂无相关数据。"
 
 
-answer_generator = AnswerGenerator()
+answer_generator = AnswerGenerator(supplement_generator=llm_client)

@@ -49,6 +49,21 @@ Invoke-RestMethod `
 The service returns demo data for `DEMO_001`, and real MySQL / Neo4j-backed
 answers when the corresponding environment variables are configured.
 
+## Optional LLM / RAG Configuration
+
+The backend supports lightweight RAG generation through an OpenAI-compatible
+chat completion API. Facts are still retrieved from MySQL / Neo4j; the LLM only
+generates `supplementalContent`. If these variables are not configured, the
+service automatically falls back to deterministic template text.
+
+```powershell
+LLM_ENABLED=true
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=gpt-4o-mini
+LLM_API_KEY=<your-api-key>
+LLM_TIMEOUT_SECONDS=20
+```
+
 ## QA Pipeline Modules
 
 `POST /api/qa/ask` is orchestrated by `app/services/qa_service.py`.
@@ -58,6 +73,7 @@ Pipeline modules:
 - `intent_recognizer.py`: recognizes the question intent. Owned later by Member 4.
 - `object_resolver.py`: resolves `object_id` from request and later entity/context data. Owned by the leader with Member 4 and Member 2.
 - `knowledge_retriever.py`: calls MySQL and Neo4j query modules. Owned later by Member 2 and Member 3.
+- `llm_client.py`: optional OpenAI-compatible LLM client for lightweight RAG supplemental generation.
 - `answer_generator.py`: renders fact-based answers and supplemental content. Owned later by Member 4.
 - `qa_logger.py`: writes `qa_log`, `qa_source_record`, and `qa_failed_question`. Owned later by Member 2.
 

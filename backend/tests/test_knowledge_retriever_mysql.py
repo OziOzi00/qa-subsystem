@@ -8,11 +8,20 @@ class FakeArtifactRepository:
     def __init__(self, artifact: ArtifactDetail | None) -> None:
         self.artifact = artifact
         self.object_ids: list[str] = []
+        self.related_by_type: list[ArtifactDetail] = []
 
     def find_by_object_id(self, object_id: str | None) -> ArtifactDetail | None:
         assert object_id is not None
         self.object_ids.append(object_id)
         return self.artifact
+
+    def find_related_by_type(
+        self,
+        object_id: str,
+        artifact_type: str | None,
+        limit: int = 5,
+    ) -> list[ArtifactDetail]:
+        return self.related_by_type[:limit]
 
 
 def _artifact(**overrides) -> ArtifactDetail:
@@ -117,6 +126,86 @@ def test_graph_intent_falls_back_to_mysql_when_neo4j_unavailable() -> None:
     assert result.status == AnswerStatus.ANSWERED
     assert result.sources[0].source_type == SourceType.MYSQL
     assert "British Museum" in result.facts[0]
+
+
+def test_neo4j_source_uses_mysql_detail_url_when_available() -> None:
+    repository = FakeArtifactRepository(_artifact())
+    retriever = KnowledgeRetriever(artifact_repository=repository)
+    retriever.neo4j_driver = object()
+    retriever._run_cypher = lambda *args, **kwargs: {
+        "museum_name": "British Museum",
+        "city": "London",
+    }
+
+    result = retriever.retrieve(
+        intent=IntentResult(intent="artifact_museum", confidence=0.75),
+        resolved_object=ResolvedObject(
+            objectId="MET_123",
+            title=None,
+            resolveSource="request_object_id",
+        ),
+        question="它收藏在哪里？",
+    )
+
+    assert result.status == AnswerStatus.ANSWERED
+    assert result.sources[0].source_type == SourceType.NEO4J
+    assert result.sources[0].detail_url == "https://example.org/artifact"
+
+
+def test_dynasty_entity_query_does_not_require_object_id() -> None:
+    retriever = KnowledgeRetriever()
+    retriever.neo4j_driver = object()
+    retriever._run_cypher_multi = lambda *args, **kwargs: [
+        {"object_id": "QING_001", "title": "清代瓷器"},
+    ]
+
+    result = retriever.retrieve(
+        intent=IntentResult(
+            intent="same_dynasty_artifacts",
+            confidence=0.84,
+            entities={"dynasty": "清朝"},
+            needs_object=False,
+        ),
+        resolved_object=ResolvedObject(
+            objectId=None,
+            title=None,
+            resolveSource="not_required_for_intent",
+        ),
+        question="清朝有哪些代表性文物？",
+    )
+
+    assert result.status == AnswerStatus.ANSWERED
+    assert result.related_artifacts[0].object_id == "QING_001"
+    assert "清朝相关代表性文物" in result.facts[0]
+
+
+def test_related_artifacts_merge_graph_and_mysql_type_results() -> None:
+    repository = FakeArtifactRepository(_artifact(type="Ceramics"))
+    repository.related_by_type = [
+        _artifact(id=11, object_id="MYSQL_001", title="同类型瓷器"),
+    ]
+    retriever = KnowledgeRetriever(artifact_repository=repository)
+    retriever.neo4j_driver = object()
+    retriever._run_cypher_multi = lambda *args, **kwargs: [
+        {"object_id": "GRAPH_001", "title": "同朝代瓷器", "reason": "同朝代"},
+    ]
+
+    result = retriever.retrieve(
+        intent=IntentResult(intent="related_artifacts", confidence=0.78),
+        resolved_object=ResolvedObject(
+            objectId="MET_123",
+            title=None,
+            resolveSource="request_object_id",
+        ),
+        question="推荐相关文物",
+    )
+
+    assert result.status == AnswerStatus.ANSWERED
+    assert [item.object_id for item in result.related_artifacts] == [
+        "GRAPH_001",
+        "MYSQL_001",
+    ]
+    assert result.sources[0].source_type == SourceType.NEO4J
 
 
 def test_graph_intent_without_databases_returns_neo4j_not_configured() -> None:
