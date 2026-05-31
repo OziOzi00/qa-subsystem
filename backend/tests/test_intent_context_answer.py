@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.models.qa_pipeline import IntentResult, RetrievalResult
-from app.schemas.qa import AnswerStatus, ResolvedObject
+from app.schemas.qa import AnswerStatus, ResolvedObject, SourceType
 from app.services.answer_generator import AnswerGenerator
 from app.services.intent_recognizer import IntentRecognizer
 from app.services.session_context import SessionContextStore
@@ -103,6 +103,41 @@ def test_answer_generator_uses_clear_no_data_template() -> None:
 
     assert answer.status == AnswerStatus.NO_DATA
     assert answer.answer == "暂无该文物材质数据。"
+
+
+class FakeSupplementGenerator:
+    is_configured = True
+
+    def generate_supplement(self, **kwargs):
+        class Result:
+            content = "该文物的事实信息已由知识库检索确认。"
+            model = "fake-rag-model"
+
+        return Result()
+
+
+def test_answer_generator_adds_llm_supplement_source_when_configured() -> None:
+    generator = AnswerGenerator(supplement_generator=FakeSupplementGenerator())
+    retrieval = RetrievalResult(
+        status=AnswerStatus.ANSWERED,
+        facts=["青花瓷的材质为 porcelain。"],
+    )
+
+    answer = generator.generate(
+        intent=IntentResult(intent="artifact_material", confidence=0.8),
+        resolved_object=ResolvedObject(
+            objectId="MET_123",
+            title="青花瓷",
+            resolveSource="request_object_id",
+        ),
+        retrieval=retrieval,
+        question="这件文物的材质是什么？",
+    )
+
+    assert answer.status == AnswerStatus.ANSWERED
+    assert answer.fact_content == "青花瓷的材质为 porcelain。"
+    assert answer.supplemental_content == "该文物的事实信息已由知识库检索确认。"
+    assert retrieval.sources[-1].source_type == SourceType.LLM
 
 
 def test_ask_endpoint_uses_demo_object_and_records_context() -> None:

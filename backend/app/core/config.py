@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     NEO4J_USER: str | None = None
     NEO4J_PASSWORD: str | None = None
 
+    LLM_API_KEY: str | None = None
+    LLM_BASE_URL: str | None = None
+    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_TIMEOUT_SECONDS: int = 20
+    LLM_ENABLED: bool = True
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

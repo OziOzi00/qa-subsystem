@@ -13,6 +13,7 @@
 - MySQL 文物基础信息查询、日志、来源、失败问题记录；
 - Neo4j 图谱查询和复杂问答基础版；
 - 意图识别、实体抽取、最近 5 轮上下文、回答模板；
+- 可配置轻量 RAG 补充生成，未配置 LLM 时模板回退；
 - 用户反馈、审核任务、后台管理接口；
 - pytest 自动化测试和接口联调用例。
 
@@ -24,7 +25,7 @@
 → IntentRecognizer 识别意图和实体
 → ObjectResolver 解析 object_id
 → KnowledgeRetriever 查询 MySQL / Neo4j
-→ AnswerGenerator 生成回答
+→ AnswerGenerator 生成回答，并在配置 LLM 时生成 RAG 补充说明
 → QALogger 写入 qa_log / qa_source_record / qa_failed_question
 → 返回答案、来源、推荐文物、debug 信息
 ```
@@ -61,7 +62,8 @@
 | 上下文 | `app/services/session_context.py` | 当前文物和最近 5 轮问答 |
 | MySQL | `app/db/mysql.py`, `app/repositories/mysql/*` | 公共库查询和 qa_ 表写入 |
 | Neo4j | `app/services/knowledge_retriever.py` | 图谱关系和复杂问答 |
-| 回答生成 | `app/services/answer_generator.py` | 回答模板和暂无数据兜底 |
+| LLM 补充生成 | `app/services/llm_client.py` | OpenAI 兼容接口，可选启用，生成 supplementalContent |
+| 回答生成 | `app/services/answer_generator.py` | 回答模板、RAG 补充和暂无数据兜底 |
 | 反馈后台 | `app/services/feedback_service.py`, `app/services/admin_service.py` | 反馈、审核任务、统计接口 |
 
 ## 5. 前端接入字段
@@ -73,7 +75,7 @@
 - `intent`：问题类型；
 - `answer`：直接展示给用户的回答；
 - `factContent`：来自 MySQL / Neo4j 的事实内容；
-- `supplementalContent`：模板或未来大模型补充说明；
+- `supplementalContent`：模板或可配置大模型补充说明；
 - `resolvedObject`：当前文物对象；
 - `sources`：答案来源；
 - `relatedArtifacts`：推荐文物；
@@ -82,8 +84,8 @@
 
 ## 6. 当前剩余工作
 
-- 成员五完成 Vue 问答页面；
-- 前端接入 `/api/qa/ask` 和 `/api/qa/feedback`；
 - 使用真实文物 `object_id` 做 MySQL / Neo4j 联调；
 - 校验成员三 Cypher 与实际图谱 schema 是否完全一致；
+- 准备固定演示样例，覆盖 MySQL、Neo4j、统计问答、反馈和 RAG 回退；
+- 若取得 LLM API Key，在 `.env` 中配置 `LLM_API_KEY` 并验证补充生成；
 - 准备最终演示数据和答辩脚本。

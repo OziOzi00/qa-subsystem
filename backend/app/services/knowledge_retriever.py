@@ -182,6 +182,8 @@ class KnowledgeRetriever:
         elif intent_type == "same_artist_artifacts":
             return self._query_artifacts_by_artist(object_id) if object_id else None
         elif intent_type == "same_dynasty_artifacts":
+            if intent.entities.get("dynasty"):
+                return self._query_artifacts_by_dynasty_entity(str(intent.entities["dynasty"]))
             return self._query_artifacts_by_dynasty(object_id) if object_id else None
         elif intent_type == "related_artifacts":
             return self._query_related_artifacts(object_id) if object_id else None
@@ -227,7 +229,7 @@ class KnowledgeRetriever:
         source = AnswerSource(
             sourceType=SourceType.NEO4J,
             sourceName="知识图谱·收藏关系",
-            detailUrl=None,
+            detailUrl=self._detail_url_for_object(object_id),
             factText=fact_text,
             confidence=0.95,
         )
@@ -257,7 +259,7 @@ class KnowledgeRetriever:
         source = AnswerSource(
             sourceType=SourceType.NEO4J,
             sourceName="知识图谱·年代关系",
-            detailUrl=None,
+            detailUrl=self._detail_url_for_object(object_id),
             factText=fact_text,
             confidence=0.95,
         )
@@ -287,7 +289,7 @@ class KnowledgeRetriever:
         source = AnswerSource(
             sourceType=SourceType.NEO4J,
             sourceName="知识图谱·作者关系",
-            detailUrl=None,
+            detailUrl=self._detail_url_for_object(object_id),
             factText=fact_text,
             confidence=0.95,
         )
@@ -342,7 +344,7 @@ class KnowledgeRetriever:
         source = AnswerSource(
             sourceType=SourceType.NEO4J,
             sourceName="知识图谱·同作者作品",
-            detailUrl=None,
+            detailUrl=self._detail_url_for_object(object_id),
             factText="；".join(facts),
             confidence=0.9,
         )
@@ -394,7 +396,7 @@ class KnowledgeRetriever:
         source = AnswerSource(
             sourceType=SourceType.NEO4J,
             sourceName="知识图谱·同朝代文物",
-            detailUrl=None,
+            detailUrl=self._detail_url_for_object(object_id),
             factText="；".join(facts),
             confidence=0.9,
         )
@@ -405,34 +407,107 @@ class KnowledgeRetriever:
             related_artifacts=related,
         )
 
+    def _query_artifacts_by_dynasty_entity(self, dynasty: str) -> Optional[RetrievalResult]:
+        """
+        功能：查询某朝代的代表性文物。
+        输入：朝代实体，如“明朝”“清”
+        输出：代表性文物列表，不依赖当前 object_id。
+        """
+        normalized_dynasty = dynasty.strip()
+        if not normalized_dynasty:
+            return None
+        dynasty_keyword = (
+            normalized_dynasty.removesuffix("时期")
+            .removesuffix("朝代")
+            .removesuffix("朝")
+            .removesuffix("代")
+        ) or normalized_dynasty
+        cypher = """
+            MATCH (d:Dynasty)<-[:BELONGS_TO]-(a:Artifact)
+            WHERE any(name IN [d.name_zh, d.name] WHERE
+                name IS NOT NULL
+                AND name <> ''
+                AND (
+                    name CONTAINS $dynasty
+                    OR name CONTAINS $keyword
+                    OR $dynasty CONTAINS name
+                    OR $keyword CONTAINS name
+                )
+            )
+            RETURN a.object_id AS object_id, a.title_zh AS title
+            LIMIT 5
+        """
+        records = self._run_cypher_multi(
+            cypher,
+            dynasty=normalized_dynasty,
+            keyword=dynasty_keyword,
+        )
+        if not records:
+            return None
+
+        facts = [f"{normalized_dynasty}相关代表性文物："]
+        related = []
+        seen: set[str] = set()
+        for rec in records:
+            oid = rec.get("object_id")
+            if not oid or str(oid) in seen:
+                continue
+            seen.add(str(oid))
+            title = rec.get("title") or str(oid)
+            facts.append(f"- {title} ({oid})")
+            artifact = self._artifact_detail_for_object(str(oid))
+            related.append(RelatedArtifact(
+                objectId=str(oid),
+                title=str(title),
+                reason=f"{normalized_dynasty}代表性文物",
+                imageUrl=artifact.image_url if artifact else None,
+            ))
+        if not related:
+            return None
+
+        source = AnswerSource(
+            sourceType=SourceType.NEO4J,
+            sourceName="知识图谱·朝代代表文物",
+            detailUrl=None,
+            factText="；".join(facts),
+            confidence=0.9,
+        )
+        return RetrievalResult(
+            status=AnswerStatus.ANSWERED,
+            facts=facts,
+            sources=[source],
+            related_artifacts=related,
+            raw={"dataset": "neo4j", "dynasty": normalized_dynasty},
+        )
+
     def _query_related_artifacts(self, object_id: str) -> Optional[RetrievalResult]:
         """
-        功能：相关文物推荐（基础版：同作者优先，可扩展同朝代、同类型）
+        功能：相关文物推荐（同作者优先，同朝代其次，同类型补充）
         输入：当前文物的 object_id
         输出：推荐文物列表
         """
-        # 简化：基于同作者推荐（也可改为 UNION 同朝代）
-        cypher = """
-            MATCH (a:Artifact {object_id: $oid})-[:CREATED_BY]->(art:Artist)<-[:CREATED_BY]-(other:Artifact)
-            WHERE other.object_id <> $oid
-            RETURN other.object_id AS object_id, other.title_zh AS title, '同作者' as reason
-            LIMIT 5
-        """
-        records = self._run_cypher_multi(cypher, oid=object_id)
-        if not records:
+        related = self._query_related_from_graph(object_id)
+        related = self._append_mysql_type_related(object_id, related)
+        if not related:
             return None
-        related = []
-        for rec in records:
-            related.append(RelatedArtifact(
-                objectId=rec["object_id"],
-                title=rec.get("title", rec["object_id"]),
-                reason=rec["reason"],
-                imageUrl=None,
-            ))
+        related = related[:5]
+        facts = [f"按同作者、同朝代或同类型规则，推荐 {len(related)} 件相关文物。"]
+        facts.extend(
+            f"- {item.title} ({item.object_id})：{item.reason or '相关文物'}"
+            for item in related
+        )
         return RetrievalResult(
             status=AnswerStatus.ANSWERED,
-            facts=[f"推荐 {len(related)} 件相关文物"],
-            sources=[],
+            facts=facts,
+            sources=[
+                AnswerSource(
+                    sourceType=SourceType.NEO4J,
+                    sourceName="知识图谱·相关文物推荐",
+                    detailUrl=self._detail_url_for_object(object_id),
+                    factText="；".join(facts),
+                    confidence=0.85,
+                )
+            ],
             related_artifacts=related,
         )
 
@@ -557,7 +632,7 @@ class KnowledgeRetriever:
                 source = AnswerSource(
                     sourceType=SourceType.NEO4J,
                     sourceName="知识图谱·多跳",
-                    detailUrl=None,
+                    detailUrl=self._detail_url_for_object(object_id),
                     factText=fact_text,
                     confidence=0.95,
                 )
@@ -599,6 +674,91 @@ class KnowledgeRetriever:
             sources=[],
             related_artifacts=related,
         )
+
+    def _query_related_from_graph(self, object_id: str) -> list[RelatedArtifact]:
+        cypher = """
+            MATCH (a:Artifact {object_id: $oid})
+            OPTIONAL MATCH (a)-[:CREATED_BY]->(:Artist)<-[:CREATED_BY]-(author_other:Artifact)
+            WHERE author_other.object_id <> $oid
+            OPTIONAL MATCH (a)-[:BELONGS_TO]->(:Dynasty)<-[:BELONGS_TO]-(dynasty_other:Artifact)
+            WHERE dynasty_other.object_id <> $oid
+            WITH collect({
+                object_id: author_other.object_id,
+                title: author_other.title_zh,
+                reason: '同作者'
+            }) + collect({
+                object_id: dynasty_other.object_id,
+                title: dynasty_other.title_zh,
+                reason: '同朝代'
+            }) AS rows
+            UNWIND rows AS row
+            WITH row
+            WHERE row.object_id IS NOT NULL
+            RETURN row.object_id AS object_id, row.title AS title, row.reason AS reason
+            LIMIT 10
+        """
+        records = self._run_cypher_multi(cypher, oid=object_id)
+        related: list[RelatedArtifact] = []
+        seen: set[str] = set()
+        for rec in records:
+            oid = rec.get("object_id")
+            if not oid or str(oid) in seen:
+                continue
+            seen.add(str(oid))
+            artifact = self._artifact_detail_for_object(str(oid))
+            related.append(
+                RelatedArtifact(
+                    objectId=str(oid),
+                    title=str(rec.get("title") or (artifact.title if artifact else oid)),
+                    reason=str(rec.get("reason") or "图谱关系相关"),
+                    imageUrl=artifact.image_url if artifact else None,
+                )
+            )
+        return related
+
+    def _append_mysql_type_related(
+        self,
+        object_id: str,
+        related: list[RelatedArtifact],
+    ) -> list[RelatedArtifact]:
+        if self._artifact_repository is None or len(related) >= 5:
+            return related
+        artifact = self._artifact_repository.find_by_object_id(object_id)
+        if artifact is None or not artifact.type:
+            return related
+
+        seen = {item.object_id for item in related}
+        for item in self._artifact_repository.find_related_by_type(
+            object_id,
+            artifact.type,
+            limit=5,
+        ):
+            if item.object_id in seen:
+                continue
+            seen.add(item.object_id)
+            related.append(
+                RelatedArtifact(
+                    objectId=item.object_id,
+                    title=item.title,
+                    reason=f"同类型 {artifact.type}",
+                    imageUrl=item.image_url,
+                )
+            )
+            if len(related) >= 5:
+                break
+        return related
+
+    def _artifact_detail_for_object(self, object_id: str | None) -> ArtifactDetail | None:
+        if self._artifact_repository is None or not object_id:
+            return None
+        try:
+            return self._artifact_repository.find_by_object_id(object_id)
+        except Exception:
+            return None
+
+    def _detail_url_for_object(self, object_id: str | None) -> str | None:
+        artifact = self._artifact_detail_for_object(object_id)
+        return artifact.detail_url if artifact else None
 
     # =================== 辅助方法 ===================
     def _run_cypher(self, cypher: str, **params) -> Optional[Dict[str, Any]]:

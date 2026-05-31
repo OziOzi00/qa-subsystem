@@ -13,6 +13,7 @@
 - `objectId` 统一关联逻辑
 - 答案来源和原始详情页链接展示
 - 事实内容 `factContent` 与补充描述 `supplementalContent` 区分
+- 可配置轻量 RAG：MySQL / Neo4j 检索事实，LLM 生成补充描述，未配置时模板回退
 - 暂无数据兜底回答
 - 多轮上下文基础版
 - 复杂问答基础版
@@ -52,7 +53,7 @@ MySQL 文物详情查询 + Neo4j 图谱关系查询
 | 接口风格 | RESTful API |
 | 协作平台 | GitHub |
 
-当前后端已提供可运行的 FastAPI 骨架和 `DEMO_001` / `DEMO_002` 演示数据，便于前端和各模块提前联调。
+当前项目已集成 FastAPI 后端、Vue 前端、公共 MySQL、Neo4j、反馈后台接口和轻量 RAG 补充生成能力。`DEMO_001` / `DEMO_002` 仍保留用于无数据库环境下的演示和联调。
 
 ## 目录结构
 
@@ -68,7 +69,7 @@ qa-subsystem/
 │   ├── .env.example          # 后端环境变量示例
 │   ├── README.md             # 后端启动说明
 │   └── requirements.txt      # 后端依赖
-├── frontend/                 # Vue 前端，成员 5 后续开发
+├── frontend/                 # Vue 问答前端
 ├── data/                     # 样例数据或演示数据
 ├── docs/
 │   ├── api/                  # API 文档
@@ -158,29 +159,32 @@ Invoke-RestMethod `
 
 - FastAPI 后端基础框架
 - `/api/health`
-- `/api/qa/ask` 主接口骨架
-- 主流程编排骨架
+- `/api/qa/ask` 主接口
+- 主流程编排
 - `objectId` 解析逻辑
+- MySQL 文物基础信息查询、问答日志、来源记录和失败问题记录
+- Neo4j 图谱查询、统计类问答和简单多跳问答基础版
+- 11 类简单问答意图识别、实体抽取和最近 5 轮上下文基础版
+- 可配置轻量 RAG，未配置 LLM 时模板回退
+- `/api/qa/feedback`、审核任务和后台管理接口
+- Vue 问答页面、来源展示、推荐展示和反馈按钮
 - 演示数据 `DEMO_001` / `DEMO_002`
 - API 文档
 - Git 协作和 PR 审核规范
+- pytest 自动化测试和前端构建检查
 
-待接入：
+待增强：
 
-- MySQL 真实数据查询
-- Neo4j 真实图谱查询
-- 问答日志、来源记录、失败问题写入
-- 多轮上下文持久化
-- `/api/qa/feedback`
-- 后台管理接口初稿
-- Vue 问答页面
-- 测试用例和测试报告
+- 获取 LLM API Key 后验证真实大模型补充生成
+- 多轮上下文持久化到 `qa_session`
+- 根据最终知识图谱数据继续完善演示样例
+- 第 16 周配合 Web / App / 后台管理系统做整体集成
 
 ## 文档入口
 
 | 文档 | 路径 |
 |---|---|
-| 项目管理计划 | [docs/project-plan/知识问答子系统项目管理计划-v0.3.md](docs/project-plan/知识问答子系统项目管理计划-v0.3.md) |
+| 项目管理计划 | [docs/project-plan/知识问答子系统项目管理计划-v0.4.md](docs/project-plan/知识问答子系统项目管理计划-v0.4.md) |
 | API 文档 | [docs/api/qa-api.md](docs/api/qa-api.md) |
 | Git 协作规范 | [docs/development/git-workflow.md](docs/development/git-workflow.md) |
 | PR 审核清单 | [docs/development/review-checklist.md](docs/development/review-checklist.md) |

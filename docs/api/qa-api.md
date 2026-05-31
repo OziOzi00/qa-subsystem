@@ -71,7 +71,9 @@ Content-Type: application/json
 前端展示时应区分 `factContent` 和 `supplementalContent`：
 
 - `factContent`：来自 MySQL / Neo4j / 已确认数据源的事实内容。
-- `supplementalContent`：模板或大语言模型生成的补充性描述。
+- `supplementalContent`：模板或可配置大语言模型生成的补充性描述。
+
+当前后端支持轻量 RAG：先从 MySQL / Neo4j 检索事实，再在配置 LLM 时把事实作为上下文生成补充说明。未配置 LLM 或调用失败时，系统会自动回退到模板补充说明，事实性答案仍以 MySQL / Neo4j 检索结果为准。
 
 ## 3. 健康检查
 
@@ -149,7 +151,7 @@ Content-Type: application/json
   "intent": "artifact_museum",
   "answer": "演示文物 DEMO_001 现藏于克利夫兰艺术博物馆。",
   "factContent": "演示文物 DEMO_001 现藏于克利夫兰艺术博物馆。",
-  "supplementalContent": "该回答由模板根据知识库事实生成；后续接入大语言模型时，补充性描述将在此单独标注。",
+  "supplementalContent": "该回答由系统根据 MySQL 或 Neo4j 中的已确认事实生成；当前未启用大语言模型补充生成，已使用模板兜底。",
   "resolvedObject": {
     "objectId": "DEMO_001",
     "title": "演示文物",
@@ -319,11 +321,11 @@ Content-Type: application/json
 | `statistics_top_museum` | 收藏某类型最多的博物馆 | Neo4j |
 | `museum_city` | 多跳关系中的博物馆城市 | Neo4j + MySQL |
 
-## 5. 用户反馈接口初稿
+## 5. 用户反馈接口
 
 ### POST `/api/qa/feedback`
 
-当前接口属于成员 6 后续实现范围，本文档先确定联调契约。
+该接口用于记录用户“有帮助 / 不准确”反馈。`inaccurate` 会自动生成审核任务。
 
 请求示例：
 
@@ -361,9 +363,9 @@ Content-Type: application/json
 - `helpful` 写入 `qa_feedback`。
 - `inaccurate` 写入 `qa_feedback`，并生成 `qa_review_task`。
 
-## 6. 后台管理接口初稿
+## 6. 后台管理接口
 
-以下接口由成员 6 后续实现，用于后台管理组查看问答日志、反馈、失败问题和审核任务。
+以下接口用于后台管理组查看问答日志、反馈、失败问题、审核任务和统计结果。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -372,6 +374,8 @@ Content-Type: application/json
 | GET | `/api/admin/qa/failed-questions` | 查询失败问题 |
 | GET | `/api/admin/qa/review-tasks` | 查询审核任务 |
 | POST | `/api/admin/qa/review-tasks/{id}/review` | 提交审核结果 |
+| GET | `/api/admin/qa/statistics/failure-types` | 统计高频失败问题类型 |
+| GET | `/api/admin/qa/statistics/inaccurate-types` | 统计高频不准确问题类型 |
 
 ### 6.1 查询参数建议
 
@@ -450,11 +454,12 @@ App 端负责：
 }
 ```
 
-## 9. 后续实现注意事项
+## 9. 实现注意事项
 
-1. 成员 2 接入 MySQL 后，`qaLogId` 应来自 `qa_log` 实际记录。
-2. 成员 2 写入来源时，应把 `sources` 中使用过的数据同步到 `qa_source_record`。
-3. 成员 3 接入 Neo4j 后，图谱查询结果应保留可追溯的节点、关系和来源。
-4. 成员 4 接入多轮上下文后，应保存最近 5 轮对话并支持话题切换。
-5. 成员 5 前端展示时，不应混淆事实内容和补充描述。
-6. 成员 6 反馈接口实现后，`inaccurate` 必须生成审核任务。
+1. `qaLogId` 来自 `qa_log` 实际记录，反馈接口依赖该字段。
+2. `sources` 中使用过的数据会同步写入 `qa_source_record`。
+3. Neo4j 图谱查询结果应保留可追溯的节点、关系和来源。
+4. 当前最近 5 轮上下文为基础版，后续可持久化到 `qa_session`。
+5. 前端展示时不应混淆事实内容和补充描述。
+6. `inaccurate` 反馈必须生成审核任务。
+7. 配置 LLM 后，模型只生成 `supplementalContent`，不能作为事实来源编造新事实。
