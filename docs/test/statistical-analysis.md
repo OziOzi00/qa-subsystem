@@ -3,6 +3,7 @@
 | 版本 | 日期 | 编制人 |
 |---|---|---|
 | v0.1 | 2026-05-25 | 成员 6 |
+| v0.2 | 2026-06-01 | 组长 |
 
 ---
 
@@ -26,23 +27,23 @@
 
 ## 2. 当前数据状态
 
-> 截至报告编制日，系统处于开发阶段初期，`qa_failed_question` 和 `qa_feedback` 表尚无生产数据。以下数据为开发测试期间产生的记录。
+> 截至 2026-06-01，系统已经完成反馈、审核任务和统计接口链路。当前公共库中的数据主要来自开发联调和演示测试，不代表真实用户生产数据。
 
 ### 2.1 高频失败问题类型统计
 
 | failure_type | 出现次数 | 占比 | 建议优先级 |
 |---|---|---|---|
-| *暂无数据* | 0 | — | — |
+| `no_data` / `unsupported` / `need_clarification` 等 | 以统计接口实时结果为准 | — | 按出现频率排序 |
 
-**说明：** 当前 `qa_failed_question` 尚无记录。失败问题写入由成员 2 的 `qa_logger` 模块负责，待成员 2 接入后自动积累数据。届时可通过统计接口实时查看各失败类型的分布。
+**说明：** 失败问题已由 `qa_logger` 写入 `qa_failed_question`，后台可通过 `GET /api/admin/qa/statistics/failure-types` 实时查看各失败类型分布。由于当前测试数据量很小，文档不固定写死统计数字，最终演示以前应以接口返回结果为准。
 
 ### 2.2 高频不准确问题类型统计
 
 | intent（原始问题意图） | 出现次数 | 占比 | 建议优先级 |
 |---|---|---|---|
-| *暂无数据* | 0 | — | — |
+| 各问答意图 | 以统计接口实时结果为准 | — | 按出现频率排序 |
 
-**说明：** 当前尚无 `inaccurate` 类型的反馈数据。待系统上线运行后，用户反馈将自动积累，可通过统计接口实时查看。
+**说明：** `inaccurate` 类型反馈已可写入 `qa_feedback`，并自动生成 `qa_review_task`。后台可通过 `GET /api/admin/qa/statistics/inaccurate-types` 查看不准确反馈对应的高频意图。
 
 > **注：** 测试期间已成功验证统计接口的完整链路（反馈提交 → 审核任务生成 → 统计数据可查询），确认数据流正确。
 
@@ -60,6 +61,16 @@
 | `ambiguous_entity` | 识别到多个候选文物 | 用户使用了过于通用的名称 |
 | `database_error` | 数据库查询异常 | MySQL 或 Neo4j 连接故障 |
 | `timeout` | 查询超时 | 复杂查询或数据库负载过高 |
+
+当前代码中实际写入的失败类型主要包括：
+
+| failure_type | 触发场景 |
+|---|---|
+| `no_data` | MySQL / Neo4j 无检索结果 |
+| `need_clarification` | 缺少文物对象或需要用户选择候选 |
+| `unsupported` | 意图不在当前支持范围内 |
+| `retrieval_error` | 检索阶段异常 |
+| `generation_error` | 回答生成阶段异常 |
 
 ## 4. 使用建议
 
@@ -101,3 +112,5 @@ Invoke-RestMethod -Uri http://127.0.0.1:8000/api/admin/qa/statistics/inaccurate-
 | `ambiguous_entity` | 识别到多个候选 |
 | `database_error` | 数据库查询异常 |
 | `timeout` | 查询超时 |
+| `retrieval_error` | 检索阶段异常 |
+| `generation_error` | 回答生成阶段异常 |

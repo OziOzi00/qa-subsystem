@@ -210,8 +210,8 @@ docs/meeting/
 
 接入点：
 
-1. 实现 `/api/qa/feedback`。
-2. 实现后台接口初稿。
+1. 维护 `/api/qa/feedback`。
+2. 维护后台管理接口和统计接口。
 3. 对“不准确”反馈生成 `qa_review_task`。
 4. 编写测试用例、测试报告、用户手册。
 

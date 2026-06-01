@@ -29,10 +29,16 @@
 - 功能：查询同一朝代的其他文物
 - 输出：facts 和 related_artifacts 列表
 
+### 5.1 `_query_artifacts_by_dynasty_entity(dynasty: str) -> Optional[RetrievalResult]`
+- 意图：`same_dynasty_artifacts`
+- 输入：朝代实体，来自 `intent.entities["dynasty"]`
+- 功能：不依赖当前文物，直接查询某朝代代表性文物
+- 输出：facts 和 related_artifacts 列表
+
 ### 6. `_query_related_artifacts(object_id: str) -> Optional[RetrievalResult]`
 - 意图：`related_artifacts`
-- 功能：相关文物推荐（基于同作者）
-- 输出：related_artifacts 列表，facts 为简单统计
+- 功能：相关文物推荐，综合同作者、同朝代和 MySQL 同类型兜底
+- 输出：related_artifacts 列表，facts 为推荐摘要，sources 标明图谱推荐来源
 
 ## 统计类复杂问答（使用 intent.entities）
 
@@ -64,10 +70,11 @@
 
 - `_run_cypher(cypher, **params)`: 执行单条记录查询，返回字典或 None。
 - `_run_cypher_multi(cypher, **params)`: 执行多条记录查询，返回字典列表。
+- `_detail_url_for_object(object_id)`: 通过 MySQL 回查文物原始详情页链接，补充 Neo4j 来源。
 - `_retrieve_demo(intent)`: 为 DEMO_001 提供假数据，用于前端联调，不依赖真实 Neo4j。
 
 ## 协作说明
 
-- 成员4需在识别 `statistics_count`、`statistics_top_museum`、`museum_city` 意图时，将抽取的博物馆名或类型名填入 `IntentResult.entities`，键名分别为 `"museum"` 和 `"artifact_type"`。
-- 若成员4未填充必要实体，查询将返回无数据（NO_DATA）。成员4需保证在 statistics_count、statistics_top_museum 意图中正确填充 entities。
+- 意图识别需在 `statistics_count`、`statistics_top_museum`、`museum_city` 和朝代代表性文物问答中填充 `IntentResult.entities`，键名分别为 `"museum"`、`"artifact_type"` 和 `"dynasty"`。
+- 若复杂问答缺少必要实体，查询将返回无数据（NO_DATA）。
 - 所有无数据情况返回 `AnswerStatus.NO_DATA`，前端展示“暂无相关数据”，不编造答案。

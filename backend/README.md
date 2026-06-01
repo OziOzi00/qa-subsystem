@@ -70,12 +70,12 @@ LLM_TIMEOUT_SECONDS=20
 
 Pipeline modules:
 
-- `intent_recognizer.py`: recognizes the question intent. Owned later by Member 4.
-- `object_resolver.py`: resolves `object_id` from request and later entity/context data. Owned by the leader with Member 4 and Member 2.
-- `knowledge_retriever.py`: calls MySQL and Neo4j query modules. Owned later by Member 2 and Member 3.
+- `intent_recognizer.py`: recognizes simple and complex QA intents and extracts entities.
+- `object_resolver.py`: resolves `object_id` from request, entity matching, and session context.
+- `knowledge_retriever.py`: calls MySQL and Neo4j query modules.
 - `llm_client.py`: optional OpenAI-compatible LLM client for lightweight RAG supplemental generation.
-- `answer_generator.py`: renders fact-based answers and supplemental content. Owned later by Member 4.
-- `qa_logger.py`: writes `qa_log`, `qa_source_record`, and `qa_failed_question`. Owned later by Member 2.
+- `answer_generator.py`: renders fact-based answers, LLM supplemental content, and fallback text.
+- `qa_logger.py`: writes `qa_log`, `qa_source_record`, and `qa_failed_question`.
 
 The leader-owned orchestration layer should stay stable so frontend, App, and
 other backend modules can integrate through one unified `/api/qa/ask` contract.

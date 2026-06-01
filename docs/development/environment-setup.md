@@ -23,9 +23,18 @@ MYSQL_DSN=mysql+pymysql://<username>:<password>@mysql6.sqlpub.com:3311/seitem?ch
 NEO4J_URI=bolt://<neo4j-host>:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=<password>
+
+# Optional lightweight RAG generation.
+LLM_ENABLED=true
+LLM_BASE_URL=https://api.stellarmesh.net/v1
+LLM_MODEL=gpt-4o-mini
+LLM_API_KEY=<your-api-key>
+LLM_TIMEOUT_SECONDS=20
 ```
 
 注意：Neo4j Python driver 使用 `bolt://` 或 `neo4j://` 协议。若拿到的地址写成 `http://host:7687/`，实际用于代码时应整理为 `bolt://host:7687`。
+
+LLM 配置为可选项。未配置 `LLM_API_KEY` 时，系统仍可运行，并自动使用模板生成 `supplementalContent`。若使用第三方 OpenAI 兼容平台，`LLM_BASE_URL` 应填写该平台提供的 `/v1` 地址。
 
 ## 2. 启动后端
 
@@ -54,12 +63,14 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 - MySQL 可以连接；
 - `qa_session`、`qa_log`、`qa_source_record`、`qa_feedback`、`qa_review_task`、`qa_failed_question`、`qa_intent_template` 已存在；
 - Neo4j 可以通过 Bolt 协议连接并执行 `RETURN 1`；
-- 真实写入链路可完成问答日志、反馈和后台查询。
+- 真实写入链路可完成问答日志、反馈和后台查询；
+- LLM 兼容接口配置成功时，`sources` 中会出现 `sourceType=llm`，补充说明来自模型生成。
 
 ## 4. 无配置时的降级
 
 - 未配置 MySQL：`/api/qa/ask` 仍可使用 demo 数据；反馈和后台接口返回 503。
 - 未配置 Neo4j：图谱和统计类问题返回 `no_data`，不会编造答案。
+- 未配置 LLM：事实问答正常返回，`supplementalContent` 使用模板兜底。
 - 未指定文物且当前意图需要文物：返回 `need_clarification`。
 
 ## 5. 安全约定

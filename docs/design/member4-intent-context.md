@@ -1,6 +1,6 @@
 # 成员4：意图识别、多轮上下文与答案生成说明
 
-本文档说明当前主线中成员4模块的阶段性交付范围，覆盖 11 类简单问答、复杂问答基础版实体抽取、最近 5 轮上下文记录和回答模板兜底。
+本文档说明当前主线中成员4相关模块的交付范围，覆盖 11 类简单问答、复杂问答基础版实体抽取、最近 5 轮上下文记录、回答模板兜底和轻量 RAG 补充生成。
 
 ## 1. 意图编码
 
@@ -27,6 +27,7 @@
 | `statistics_count` | 某博物馆收藏多少件文物 | `entities["museum"]` |
 | `statistics_top_museum` | 收藏某类型文物最多的博物馆 | `entities["artifact_type"]` |
 | `museum_city` | 博物馆所在城市 / 文物所在博物馆城市 | `entities["museum"]` 或当前 `object_id` |
+| `same_dynasty_artifacts` | 某朝代代表性文物 | `entities["dynasty"]` 或当前 `object_id` |
 
 ## 2. 实体抽取约定
 
@@ -59,4 +60,9 @@
 - `need_clarification`：提示补充文物名称或从候选文物中选择。
 - `unsupported`：提示当前问题暂未匹配到已支持类型。
 
-事实内容与补充说明分离：`factContent` 保存 MySQL / Neo4j 事实，`supplementalContent` 标明模板生成说明。
+事实内容与补充说明分离：
+
+- `factContent` 保存 MySQL / Neo4j 检索得到的事实。
+- `supplementalContent` 保存模板兜底说明或 LLM 基于检索事实生成的补充描述。
+- LLM 只允许基于 facts 进行语言组织，不作为事实来源编造新内容。
+- 未配置 LLM 或调用失败时，系统自动返回模板兜底补充说明。
