@@ -24,8 +24,11 @@
           <button class="ghost-btn" type="button" @click="useDemoObject">
             演示
           </button>
+          <button class="ghost-btn" type="button" @click="resetSession">
+            新会话
+          </button>
         </div>
-        <p class="hint">支持从 URL 读取 objectId，也可单独演示时手动输入。</p>
+        <p class="hint">支持从 URL 读取 objectId，也可单独演示时手动输入；新会话会清空当前文物上下文。</p>
 
         <div class="example-list">
           <button
@@ -183,7 +186,7 @@ import { nextTick, ref } from 'vue';
 import axios from 'axios';
 
 const SESSION_KEY = 'qa-web-session-id';
-const sessionId = getOrCreateSessionId();
+const sessionId = ref(getOrCreateSessionId());
 
 const question = ref('');
 const objectId = ref('');
@@ -205,9 +208,13 @@ const exampleQuestions = [
 function getOrCreateSessionId() {
   const existing = window.localStorage.getItem(SESSION_KEY);
   if (existing) return existing;
-  const created = `qa-web-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const created = createSessionId();
   window.localStorage.setItem(SESSION_KEY, created);
   return created;
+}
+
+function createSessionId() {
+  return `qa-web-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
 function getStatusText(status) {
@@ -235,6 +242,20 @@ function useDemoObject() {
   objectId.value = 'DEMO_001';
 }
 
+function resetSession() {
+  const created = createSessionId();
+  window.localStorage.setItem(SESSION_KEY, created);
+  sessionId.value = created;
+  question.value = '';
+  objectId.value = '';
+  messages.value = [];
+  selectedObjectId.value = null;
+  lastClarificationQuestion.value = '';
+
+  const cleanUrl = `${window.location.pathname}${window.location.hash || ''}`;
+  window.history.replaceState({}, '', cleanUrl);
+}
+
 function sendQuestion(text) {
   question.value = text;
   sendMessage();
@@ -258,7 +279,7 @@ async function sendMessage(overrideQuestion = null) {
     const response = await axios.post('/api/qa/ask', {
       question: currentQuestion,
       objectId: objectId.value || undefined,
-      sessionId,
+      sessionId: sessionId.value,
       sourceClient: 'web'
     });
 

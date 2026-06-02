@@ -1,9 +1,10 @@
 from fastapi.testclient import TestClient
 
 from app.models.qa_pipeline import IntentResult, RetrievalResult
-from app.schemas.qa import AnswerStatus, ResolvedObject, SourceType
+from app.schemas.qa import AnswerStatus, AskRequest, ResolvedObject, SourceType
 from app.services.answer_generator import AnswerGenerator
 from app.services.intent_recognizer import IntentRecognizer
+from app.services.object_resolver import ObjectResolver
 from app.services.session_context import SessionContextStore
 from app.main import app
 
@@ -76,6 +77,34 @@ def test_pronoun_museum_city_uses_object_context() -> None:
     assert result.intent == "museum_city"
     assert result.needs_object is True
     assert result.entities == {}
+
+
+def test_explicit_object_id_wins_over_ambiguous_question_candidates(monkeypatch) -> None:
+    class FakeCandidate:
+        def __init__(self, object_id: str) -> None:
+            self.object_id = object_id
+            self.title = "花瓶"
+
+        def to_response_candidate(self):
+            return {"objectId": self.object_id, "title": self.title}
+
+    monkeypatch.setattr(
+        "app.services.object_resolver.artifact_matcher.match",
+        lambda question: [FakeCandidate("1"), FakeCandidate("5")],
+    )
+
+    resolved = ObjectResolver().resolve(
+        AskRequest(
+            question="介绍一下花瓶",
+            objectId="5",
+            sessionId="candidate-confirm-test",
+        ),
+        IntentResult(intent="artifact_description", confidence=0.8),
+    )
+
+    assert resolved.object_id == "5"
+    assert resolved.resolve_source == "request_object_id"
+    assert resolved.candidates == []
 
 
 def test_session_context_keeps_latest_five_turns() -> None:

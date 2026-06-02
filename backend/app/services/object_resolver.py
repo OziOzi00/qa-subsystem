@@ -23,6 +23,7 @@ class ObjectResolver:
             )
 
         question_candidates = artifact_matcher.match(request.question.strip())
+        request_object_id = request.object_id.strip() if request.object_id else None
         if len(question_candidates) == 1:
             candidate = question_candidates[0]
             return ResolvedObject(
@@ -30,6 +31,13 @@ class ObjectResolver:
                 title=candidate.title,
                 resolveSource="question_entity",
                 candidates=[candidate.to_response_candidate()],
+            )
+
+        if request_object_id:
+            return ResolvedObject(
+                objectId=request_object_id,
+                title=None,
+                resolveSource="request_object_id",
             )
 
         if len(question_candidates) > 1:
@@ -41,14 +49,6 @@ class ObjectResolver:
                     candidate.to_response_candidate()
                     for candidate in question_candidates
                 ],
-            )
-
-        request_object_id = request.object_id.strip() if request.object_id else None
-        if request_object_id:
-            return ResolvedObject(
-                objectId=request_object_id,
-                title=None,
-                resolveSource="request_object_id",
             )
 
         session_key = request.session_id or request.conversation_id
