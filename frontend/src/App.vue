@@ -78,7 +78,7 @@
                   <p>{{ message.supplementalContent }}</p>
                 </section>
 
-                <section v-if="message.candidates.length" class="choice-block">
+                <section v-if="message.status === 'need_clarification' && message.candidates.length" class="choice-block">
                   <h3>请选择文物</h3>
                   <button
                     v-for="candidate in message.candidates"

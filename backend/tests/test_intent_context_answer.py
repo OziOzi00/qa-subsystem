@@ -107,6 +107,32 @@ def test_explicit_object_id_wins_over_ambiguous_question_candidates(monkeypatch)
     assert resolved.candidates == []
 
 
+def test_unique_question_entity_does_not_return_choice_candidates(monkeypatch) -> None:
+    class FakeCandidate:
+        object_id = "161"
+        title = "犀牛角杯"
+
+        def to_response_candidate(self):
+            return {"objectId": self.object_id, "title": self.title}
+
+    monkeypatch.setattr(
+        "app.services.object_resolver.artifact_matcher.match",
+        lambda question: [FakeCandidate()],
+    )
+
+    resolved = ObjectResolver().resolve(
+        AskRequest(
+            question="介绍一下犀牛角杯",
+            sessionId="unique-candidate-test",
+        ),
+        IntentResult(intent="artifact_description", confidence=0.8),
+    )
+
+    assert resolved.object_id == "161"
+    assert resolved.resolve_source == "question_entity"
+    assert resolved.candidates == []
+
+
 def test_session_context_keeps_latest_five_turns() -> None:
     store = SessionContextStore()
     resolved = ResolvedObject(

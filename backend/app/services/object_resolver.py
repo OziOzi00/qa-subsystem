@@ -30,7 +30,6 @@ class ObjectResolver:
                 objectId=candidate.object_id,
                 title=candidate.title,
                 resolveSource="question_entity",
-                candidates=[candidate.to_response_candidate()],
             )
 
         if request_object_id:
