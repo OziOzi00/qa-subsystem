@@ -23,6 +23,21 @@ class FakeArtifactRepository:
     ) -> list[ArtifactDetail]:
         return self.related_by_type[:limit]
 
+    def find_museum_by_name(self, museum_name: str | None) -> dict[str, str | None] | None:
+        if museum_name == "The Metropolitan Museum of Art":
+            return {
+                "name": "The Metropolitan Museum of Art",
+                "city": "New York",
+                "country": "United States",
+            }
+        if museum_name == "Philadelphia Museum of Art":
+            return {
+                "name": "Philadelphia Museum of Art",
+                "city": "Philadelphia",
+                "country": "United States",
+            }
+        return None
+
 
 def _artifact(**overrides) -> ArtifactDetail:
     values = {
@@ -205,6 +220,35 @@ def test_related_artifacts_merge_graph_and_mysql_type_results() -> None:
         "GRAPH_001",
         "MYSQL_001",
     ]
+    assert result.sources[0].source_type == SourceType.NEO4J
+
+
+def test_museum_city_backfills_city_from_mysql_when_graph_has_no_city() -> None:
+    repository = FakeArtifactRepository(_artifact())
+    retriever = KnowledgeRetriever(artifact_repository=repository)
+    retriever.neo4j_driver = object()
+    retriever._run_cypher = lambda *args, **kwargs: {
+        "museum": "The Metropolitan Museum of Art",
+        "city": None,
+    }
+
+    result = retriever.retrieve(
+        intent=IntentResult(
+            intent="museum_city",
+            confidence=0.9,
+            entities={"museum": "The Metropolitan Museum of Art"},
+            needs_object=False,
+        ),
+        resolved_object=ResolvedObject(
+            objectId=None,
+            title=None,
+            resolveSource="not_required_for_intent",
+        ),
+        question="The Metropolitan Museum of Art 位于哪个城市？",
+    )
+
+    assert result.status == AnswerStatus.ANSWERED
+    assert result.facts == ["The Metropolitan Museum of Art 位于 New York"]
     assert result.sources[0].source_type == SourceType.NEO4J
 
 

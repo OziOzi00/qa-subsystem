@@ -570,8 +570,12 @@ class KnowledgeRetriever:
             return None
         museum = record.get("museum")
         city = record.get("city")
+        if not city:
+            location = self._museum_location_for_name(str(museum) if museum else None)
+            city = location.get("city") if location else None
         cnt = record.get("cnt", 0)
-        fact_text = f"收藏 {artifact_type} 最多的博物馆是 {museum}（{city}），共 {cnt} 件"
+        location_text = f"（{city}）" if city else ""
+        fact_text = f"收藏 {artifact_type} 最多的博物馆是 {museum}{location_text}，共 {cnt} 件"
         source = AnswerSource(
             sourceType=SourceType.NEO4J,
             sourceName="知识图谱·统计",
@@ -597,13 +601,20 @@ class KnowledgeRetriever:
             museum_name = intent.entities.get('museum')
             if museum_name:
                 cypher = """
-                    MATCH (m:Museum {name: $name})
-                    RETURN m.city AS city
+                    MATCH (m:Museum)
+                    WHERE m.name = $name OR m.name CONTAINS $name
+                    RETURN m.name AS museum, m.city AS city
+                    LIMIT 1
                 """
                 record = self._run_cypher(cypher, name=museum_name)
-                if record and record.get("city"):
-                    city = record["city"]
-                    fact_text = f"{museum_name} 位于 {city}"
+                museum = record.get("museum") if record else museum_name
+                city = record.get("city") if record else None
+                if not city:
+                    location = self._museum_location_for_name(str(museum_name))
+                    city = location.get("city") if location else None
+                    museum = location.get("name") if location and location.get("name") else museum
+                if city:
+                    fact_text = f"{museum} 位于 {city}"
                     source = AnswerSource(
                         sourceType=SourceType.NEO4J,
                         sourceName="知识图谱·多跳",
@@ -625,9 +636,14 @@ class KnowledgeRetriever:
                 LIMIT 1
             """
             record = self._run_cypher(cypher, oid=object_id)
-            if record and record.get("city"):
+            if record:
                 museum = record.get("museum")
                 city = record.get("city")
+                if not city:
+                    location = self._museum_location_for_name(str(museum) if museum else None)
+                    city = location.get("city") if location else None
+                if not city:
+                    return None
                 fact_text = f"{museum} 位于 {city}"
                 source = AnswerSource(
                     sourceType=SourceType.NEO4J,
@@ -643,6 +659,15 @@ class KnowledgeRetriever:
                     related_artifacts=[],
                 )
         return None
+
+    def _museum_location_for_name(self, museum_name: str | None) -> dict[str, str | None] | None:
+        if self._artifact_repository is None or not museum_name:
+            return None
+        try:
+            return self._artifact_repository.find_museum_by_name(museum_name)
+        except Exception as exc:
+            logger.warning("Failed to backfill museum location from MySQL: %s", exc)
+            return None
 
     def _query_multi_hop_same_museum_dynasty(self, object_id: str) -> Optional[RetrievalResult]:
         """

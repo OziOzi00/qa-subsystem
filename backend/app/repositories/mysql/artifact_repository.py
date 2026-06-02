@@ -103,6 +103,30 @@ class ArtifactRepository:
             artists=artists,
         )
 
+    def find_museum_by_name(self, museum_name: str | None) -> dict[str, str | None] | None:
+        normalized_name = _clean(museum_name)
+        if normalized_name is None:
+            return None
+
+        row = self._client.fetch_one(
+            """
+            SELECT name, city, country
+            FROM museums
+            WHERE name = %s OR name LIKE CONCAT('%%', %s, '%%')
+            ORDER BY CASE WHEN name = %s THEN 0 ELSE 1 END, id ASC
+            LIMIT 1
+            """,
+            (normalized_name, normalized_name, normalized_name),
+        )
+        if row is None:
+            return None
+
+        return {
+            "name": _clean(row.get("name")),
+            "city": _clean(row.get("city")),
+            "country": _clean(row.get("country")),
+        }
+
     def _find_artists(self, artifact_id: int) -> list[ArtistSummary]:
         rows = self._client.fetch_all(
             """

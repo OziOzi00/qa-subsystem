@@ -83,6 +83,10 @@ class IntentRecognizer:
     _museum_city_pattern = re.compile(
         r"(?P<museum>[\u4e00-\u9fa5A-Za-z·\s]{2,40}?博物馆).{0,12}(?:城市|在哪|位于)"
     )
+    _known_museum_names: tuple[str, ...] = (
+        "The Metropolitan Museum of Art",
+        "Philadelphia Museum of Art",
+    )
 
     def recognize(self, question: str) -> IntentResult:
         text = _normalize_question(question)
@@ -110,6 +114,26 @@ class IntentRecognizer:
         self,
         text: str,
     ) -> IntentResult | None:
+        known_museum = self._extract_known_museum(text)
+
+        if known_museum and _contains_any(text, ("城市", "在哪", "位于", "where", "city")):
+            return IntentResult(
+                intent="museum_city",
+                confidence=0.9,
+                matched_keywords=["museum", "city"],
+                entities={"museum": known_museum},
+                needs_object=False,
+            )
+
+        if known_museum and _contains_any(text, ("收藏", "藏有", "馆藏", "多少", "几", "count", "total")):
+            return IntentResult(
+                intent="statistics_count",
+                confidence=0.9,
+                matched_keywords=["museum", "count"],
+                entities={"museum": known_museum},
+                needs_object=False,
+            )
+
         top_match = self._top_museum_pattern.search(text)
         if top_match:
             artifact_type = _clean_entity(top_match.group("artifact_type"))
@@ -170,12 +194,24 @@ class IntentRecognizer:
 
     def _extract_common_entities(self, text: str) -> dict[str, Any]:
         entities: dict[str, Any] = {}
+        known_museum = self._extract_known_museum(text)
+        if known_museum:
+            entities["museum"] = known_museum
+            return entities
+
         museum_match = re.search(r"([\u4e00-\u9fa5A-Za-z·\s]{2,40}?博物馆)", text)
         if museum_match and not _contains_artifact_pronoun(museum_match.group(1)):
             museum = _clean_entity(museum_match.group(1))
             if museum:
                 entities["museum"] = museum
         return entities
+
+    def _extract_known_museum(self, text: str) -> str | None:
+        normalized_text = text.lower()
+        for museum_name in self._known_museum_names:
+            if museum_name.lower() in normalized_text:
+                return museum_name
+        return None
 
     def _unknown(self) -> IntentResult:
         return IntentResult(
@@ -202,6 +238,11 @@ def _clean_entity(value: str | None) -> str | None:
 
 def _contains_artifact_pronoun(text: str) -> bool:
     return any(pronoun in text for pronoun in ("这件文物", "该文物", "这个文物", "它", "此文物"))
+
+
+def _contains_any(text: str, keywords: tuple[str, ...]) -> bool:
+    lowered = text.lower()
+    return any(keyword.lower() in lowered for keyword in keywords)
 
 
 intent_recognizer = IntentRecognizer()

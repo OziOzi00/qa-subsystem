@@ -54,6 +54,20 @@ def test_recognizes_complex_intents_and_entities() -> None:
     assert dynasty.entities == {"dynasty": "明朝"}
 
 
+def test_recognizes_english_museum_entities_for_real_dataset() -> None:
+    recognizer = IntentRecognizer()
+
+    count = recognizer.recognize("The Metropolitan Museum of Art 收藏了多少件中国文物？")
+    assert count.intent == "statistics_count"
+    assert count.needs_object is False
+    assert count.entities == {"museum": "The Metropolitan Museum of Art"}
+
+    city = recognizer.recognize("The Metropolitan Museum of Art 位于哪个城市？")
+    assert city.intent == "museum_city"
+    assert city.needs_object is False
+    assert city.entities == {"museum": "The Metropolitan Museum of Art"}
+
+
 def test_pronoun_museum_city_uses_object_context() -> None:
     recognizer = IntentRecognizer()
 
