@@ -15,6 +15,9 @@ class ArtifactCandidate:
     museum_name: str | None = None
     dynasty_name: str | None = None
     artifact_type: str | None = None
+    material: str | None = None
+    dimensions: str | None = None
+    description_preview: str | None = None
     detail_url: str | None = None
     image_url: str | None = None
 
@@ -30,6 +33,9 @@ class ArtifactCandidate:
             "museumName": self.museum_name,
             "dynastyName": self.dynasty_name,
             "artifactType": self.artifact_type,
+            "material": self.material,
+            "dimensions": self.dimensions,
+            "descriptionPreview": self.description_preview,
             "detailUrl": self.detail_url,
             "imageUrl": self.image_url,
         }

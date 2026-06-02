@@ -80,6 +80,9 @@
 
                 <section v-if="message.status === 'need_clarification' && message.candidates.length" class="choice-block">
                   <h3>请选择文物</h3>
+                  <p class="choice-hint">
+                    已展示前 10 个候选，请根据图片、材质、尺寸、馆藏或详情页选择。
+                  </p>
                   <button
                     v-for="candidate in message.candidates"
                     :key="candidate.objectId"
@@ -87,9 +90,21 @@
                     type="button"
                     @click="selectedObjectId = candidate.objectId"
                   >
+                    <img
+                      v-if="candidate.imageUrl"
+                      class="candidate-thumb"
+                      :src="candidate.imageUrl"
+                      :alt="candidate.title || candidate.objectId"
+                      loading="lazy"
+                    />
                     <span class="candidate-main">
                       <strong>{{ candidate.title || candidate.objectId }}</strong>
                       <small>objectId: {{ candidate.objectId }}</small>
+                      <small v-if="candidate.material">材质：{{ candidate.material }}</small>
+                      <small v-if="candidate.dimensions">尺寸：{{ candidate.dimensions }}</small>
+                      <small v-if="candidate.descriptionPreview">
+                        摘要：{{ candidate.descriptionPreview }}
+                      </small>
                     </span>
                     <span class="candidate-meta">
                       <small v-if="candidate.museumName">馆藏：{{ candidate.museumName }}</small>

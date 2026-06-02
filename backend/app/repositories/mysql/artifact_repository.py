@@ -166,6 +166,9 @@ class ArtifactRepository:
                 a.title_zh,
                 a.title_en,
                 a.type,
+                a.material,
+                a.dimensions,
+                a.description,
                 a.detail_url,
                 a.image_url,
                 m.name AS museum_name,
@@ -203,6 +206,9 @@ class ArtifactRepository:
                     museum_name=_clean(row.get("museum_name")),
                     dynasty_name=_clean(row.get("dynasty_name_zh")),
                     artifact_type=_clean(row.get("type")),
+                    material=_clean(row.get("material")),
+                    dimensions=_clean(row.get("dimensions")),
+                    description_preview=_preview(row.get("description")),
                     detail_url=_clean(row.get("detail_url")),
                     image_url=_clean(row.get("image_url")),
                 )
@@ -280,3 +286,13 @@ def _clean(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _preview(value: object, max_length: int = 80) -> str | None:
+    text = _clean(value)
+    if text is None:
+        return None
+    normalized = " ".join(text.split())
+    if len(normalized) <= max_length:
+        return normalized
+    return normalized[:max_length].rstrip() + "..."

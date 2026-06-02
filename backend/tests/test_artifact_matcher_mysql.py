@@ -104,6 +104,9 @@ def test_candidate_response_includes_disambiguation_metadata() -> None:
         museum_name="Philadelphia Museum of Art",
         dynasty_name="Qing dynasty",
         artifact_type="Container",
+        material="Porcelain",
+        dimensions="H. 10 cm",
+        description_preview="A porcelain vase.",
         detail_url="https://example.org/artifact/A_1",
     )
 
@@ -115,6 +118,9 @@ def test_candidate_response_includes_disambiguation_metadata() -> None:
         "museumName": "Philadelphia Museum of Art",
         "dynastyName": "Qing dynasty",
         "artifactType": "Container",
+        "material": "Porcelain",
+        "dimensions": "H. 10 cm",
+        "descriptionPreview": "A porcelain vase.",
         "detailUrl": "https://example.org/artifact/A_1",
     }
 

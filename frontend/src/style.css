@@ -275,6 +275,12 @@ button {
   background: #fffbeb;
 }
 
+.choice-hint {
+  margin: 0 0 10px !important;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
 .candidate-item,
 .related-grid button {
   display: flex;
@@ -295,6 +301,16 @@ button {
   background: #eef2ff;
 }
 
+.candidate-thumb {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  object-fit: cover;
+}
+
 .candidate-main,
 .candidate-meta {
   display: flex;
@@ -304,7 +320,7 @@ button {
 }
 
 .candidate-main {
-  flex: 1 1 44%;
+  flex: 1 1 50%;
 }
 
 .candidate-main strong {
@@ -317,7 +333,7 @@ button {
 }
 
 .candidate-meta {
-  flex: 1 1 52%;
+  flex: 1 1 34%;
   text-align: right;
 }
 
