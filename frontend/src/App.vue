@@ -87,8 +87,24 @@
                     type="button"
                     @click="selectedObjectId = candidate.objectId"
                   >
-                    <span>{{ candidate.title || candidate.objectId }}</span>
-                    <small>{{ candidate.objectId }}</small>
+                    <span class="candidate-main">
+                      <strong>{{ candidate.title || candidate.objectId }}</strong>
+                      <small>objectId: {{ candidate.objectId }}</small>
+                    </span>
+                    <span class="candidate-meta">
+                      <small v-if="candidate.museumName">馆藏：{{ candidate.museumName }}</small>
+                      <small v-if="candidate.dynastyName">朝代：{{ candidate.dynastyName }}</small>
+                      <small v-if="candidate.artifactType">类型：{{ candidate.artifactType }}</small>
+                      <a
+                        v-if="candidate.detailUrl"
+                        :href="candidate.detailUrl"
+                        target="_blank"
+                        rel="noreferrer"
+                        @click.stop
+                      >
+                        详情页
+                      </a>
+                    </span>
                   </button>
                   <button
                     class="primary-inline"
@@ -198,10 +214,11 @@ const lastClarificationQuestion = ref('');
 
 const exampleQuestions = [
   '演示文物的材质是什么？',
+  '介绍一下犀牛角杯',
   '它的尺寸是多少？',
   '这件文物收藏在哪里？',
-  '大英博物馆收藏了多少件中国文物？',
-  '收藏瓷器最多的博物馆是哪个？',
+  'The Metropolitan Museum of Art 收藏了多少件中国文物？',
+  '收藏容器最多的博物馆是哪个？',
   '推荐相关文物'
 ];
 

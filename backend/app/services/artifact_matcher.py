@@ -11,14 +11,32 @@ class ArtifactCandidate:
     title: str
     matched_name: str
     confidence: float
+    title_en: str | None = None
+    museum_name: str | None = None
+    dynasty_name: str | None = None
+    artifact_type: str | None = None
+    detail_url: str | None = None
+    image_url: str | None = None
 
     def to_response_candidate(self) -> dict[str, object]:
-        return {
+        candidate = {
             "objectId": self.object_id,
             "title": self.title,
             "matchedName": self.matched_name,
             "confidence": self.confidence,
         }
+        optional_fields = {
+            "titleEn": self.title_en,
+            "museumName": self.museum_name,
+            "dynastyName": self.dynasty_name,
+            "artifactType": self.artifact_type,
+            "detailUrl": self.detail_url,
+            "imageUrl": self.image_url,
+        }
+        candidate.update(
+            {key: value for key, value in optional_fields.items() if value}
+        )
+        return candidate
 
 
 class CandidateRepository(Protocol):
@@ -53,13 +71,13 @@ class ArtifactMatcher:
         if self._candidate_repository is not None:
             try:
                 return self._deduplicate(
-                    [
+                    self._filter_subsumed_matches([
                         candidate
                         for candidate in self._candidate_repository.search_candidates(
                             question
                         )
                         if candidate.object_id.strip()
-                    ]
+                    ])
                 )
             except Exception:
                 return []
@@ -81,6 +99,25 @@ class ArtifactMatcher:
                     break
 
         return self._deduplicate(candidates)
+
+    def _filter_subsumed_matches(
+        self,
+        candidates: list[ArtifactCandidate],
+    ) -> list[ArtifactCandidate]:
+        result: list[ArtifactCandidate] = []
+        matched_names = [candidate.matched_name for candidate in candidates]
+        for candidate in candidates:
+            matched_name = candidate.matched_name
+            normalized_name = matched_name.lower()
+            is_subsumed = any(
+                matched_name != other
+                and normalized_name in other.lower()
+                and len(other) > len(matched_name)
+                for other in matched_names
+            )
+            if not is_subsumed:
+                result.append(candidate)
+        return result
 
     def _confidence(self, matched_name: str) -> float:
         if len(matched_name) >= 4:

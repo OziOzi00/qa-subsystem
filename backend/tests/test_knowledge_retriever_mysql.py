@@ -165,6 +165,7 @@ def test_neo4j_source_uses_mysql_detail_url_when_available() -> None:
     assert result.status == AnswerStatus.ANSWERED
     assert result.sources[0].source_type == SourceType.NEO4J
     assert result.sources[0].detail_url == "https://example.org/artifact"
+    assert result.facts[0].startswith("文物“青花瓷”收藏于")
 
 
 def test_dynasty_entity_query_does_not_require_object_id() -> None:

@@ -223,7 +223,8 @@ class KnowledgeRetriever:
             return None
         museum = record["museum_name"]
         city = record.get("city")
-        fact_text = f"{object_id} 收藏于 {museum}"
+        artifact_label = self._artifact_label_for_object(object_id)
+        fact_text = f"{artifact_label}收藏于 {museum}"
         if city:
             fact_text += f"（{city}）"
         source = AnswerSource(
@@ -255,7 +256,8 @@ class KnowledgeRetriever:
         if not record or not record.get("dynasty"):
             return None
         dynasty = record["dynasty"]
-        fact_text = f"{object_id} 的年代为 {dynasty}"
+        artifact_label = self._artifact_label_for_object(object_id)
+        fact_text = f"{artifact_label}的年代为 {dynasty}"
         source = AnswerSource(
             sourceType=SourceType.NEO4J,
             sourceName="知识图谱·年代关系",
@@ -285,7 +287,8 @@ class KnowledgeRetriever:
         if not record or not record.get("artist"):
             return None
         artist = record["artist"]
-        fact_text = f"{object_id} 的作者是 {artist}"
+        artifact_label = self._artifact_label_for_object(object_id)
+        fact_text = f"{artifact_label}的作者是 {artist}"
         source = AnswerSource(
             sourceType=SourceType.NEO4J,
             sourceName="知识图谱·作者关系",
@@ -784,6 +787,12 @@ class KnowledgeRetriever:
     def _detail_url_for_object(self, object_id: str | None) -> str | None:
         artifact = self._artifact_detail_for_object(object_id)
         return artifact.detail_url if artifact else None
+
+    def _artifact_label_for_object(self, object_id: str) -> str:
+        artifact = self._artifact_detail_for_object(object_id)
+        if artifact and artifact.title:
+            return f"文物“{artifact.title}”"
+        return f"文物 {object_id} "
 
     # =================== 辅助方法 ===================
     def _run_cypher(self, cypher: str, **params) -> Optional[Dict[str, Any]]:

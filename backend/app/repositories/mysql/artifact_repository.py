@@ -160,16 +160,27 @@ class ArtifactRepository:
             return []
         rows = self._client.fetch_all(
             """
-            SELECT id, object_id, title_zh, title_en
-            FROM artifacts
-            WHERE object_id IS NOT NULL
-              AND TRIM(object_id) <> ''
+            SELECT
+                a.id,
+                a.object_id,
+                a.title_zh,
+                a.title_en,
+                a.type,
+                a.detail_url,
+                a.image_url,
+                m.name AS museum_name,
+                d.name_zh AS dynasty_name_zh
+            FROM artifacts a
+            LEFT JOIN museums m ON m.id = a.museum_id
+            LEFT JOIN dynasties d ON d.id = a.dynasty_id
+            WHERE a.object_id IS NOT NULL
+              AND TRIM(a.object_id) <> ''
               AND (
-                (title_zh IS NOT NULL AND title_zh <> '' AND %s LIKE CONCAT('%%', title_zh, '%%'))
+                (a.title_zh IS NOT NULL AND a.title_zh <> '' AND %s LIKE CONCAT('%%', a.title_zh, '%%'))
                 OR
-                (title_en IS NOT NULL AND title_en <> '' AND %s LIKE CONCAT('%%', title_en, '%%'))
+                (a.title_en IS NOT NULL AND a.title_en <> '' AND %s LIKE CONCAT('%%', a.title_en, '%%'))
               )
-            ORDER BY id ASC
+            ORDER BY a.id ASC
             LIMIT 10
             """,
             (question_text, question_text),
@@ -188,6 +199,12 @@ class ArtifactRepository:
                     title=matched_name,
                     matched_name=matched_name,
                     confidence=0.95 if len(matched_name) >= 4 else 0.75,
+                    title_en=_clean(row.get("title_en")),
+                    museum_name=_clean(row.get("museum_name")),
+                    dynasty_name=_clean(row.get("dynasty_name_zh")),
+                    artifact_type=_clean(row.get("type")),
+                    detail_url=_clean(row.get("detail_url")),
+                    image_url=_clean(row.get("image_url")),
                 )
             )
         return candidates

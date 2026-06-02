@@ -279,6 +279,7 @@ button {
 .related-grid button {
   display: flex;
   width: 100%;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 8px;
@@ -292,6 +293,39 @@ button {
 .candidate-item.selected {
   border-color: #4f46e5;
   background: #eef2ff;
+}
+
+.candidate-main,
+.candidate-meta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.candidate-main {
+  flex: 1 1 44%;
+}
+
+.candidate-main strong {
+  overflow-wrap: anywhere;
+}
+
+.candidate-main small,
+.candidate-meta small {
+  color: #64748b;
+}
+
+.candidate-meta {
+  flex: 1 1 52%;
+  text-align: right;
+}
+
+.candidate-meta a {
+  color: #4f46e5;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .primary-inline {
