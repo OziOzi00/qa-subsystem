@@ -1,262 +1,556 @@
-# 知识问答子系统 — 用户手册（成员 6 模块）
+# 知识问答子系统用户使用手册
 
-| 版本 | 日期 | 编制人 |
+| 版本 | 日期 | 适用范围 |
 |---|---|---|
-| v0.1 | 2026-05-25 | 成员 6 |
+| v1.0 | 2026-06-07 | 第 14 周知识问答子系统演示、测试与后续集成 |
 
----
+## 1. 系统简介
 
-## 1. 概述
+知识问答子系统面向“海外藏中国文物知识管理与服务平台”，为用户提供文物知识问答服务。系统基于公共 MySQL 文物数据、Neo4j 知识图谱和可选的大语言模型补充说明，支持用户用自然语言询问文物的收藏地、年代、材质、类型、介绍、作者、尺寸、相关文物等信息。
 
-本文档介绍知识问答子系统中成员 6 负责的模块：**用户反馈机制**、**审核任务管理**和**后台数据查询**的接口使用说明。
+系统回答遵循“有事实依据再回答”的原则：来自 MySQL 或 Neo4j 的事实内容会单独展示，模型或模板生成的补充说明会与事实内容分开展示；当知识库暂无数据时，系统会明确提示“暂无相关数据”或要求用户补充文物名称，不会编造答案。
 
-### 1.1 功能清单
+## 2. 用户角色
 
-| 功能 | 接口 | 说明 |
-|---|---|---|
-| 提交反馈 | `POST /api/qa/feedback` | 用户提交"有帮助/不准确"反馈 |
-| 查询日志 | `GET /api/admin/qa/logs` | 查看问答日志列表 |
-| 查询反馈 | `GET /api/admin/qa/feedback` | 查看用户反馈记录 |
-| 查询失败问题 | `GET /api/admin/qa/failed-questions` | 查看系统无法回答的问题 |
-| 查询审核任务 | `GET /api/admin/qa/review-tasks` | 查看待审核任务 |
-| 处理审核 | `POST /api/admin/qa/review-tasks/{id}/review` | 对审核任务做出裁决 |
-| 失败类型统计 | `GET /api/admin/qa/statistics/failure-types` | 查看高频失败问题类型分布 |
-| 不准确类型统计 | `GET /api/admin/qa/statistics/inaccurate-types` | 查看高频不准确问题类型分布 |
+本手册覆盖三类使用者：
 
-### 1.2 基础地址
+| 用户类型 | 主要操作 |
+|---|---|
+| 普通用户 / 演示用户 | 在前端页面输入问题、查看答案、选择候选文物、查看来源、提交反馈 |
+| Web / App 集成调用方 | 通过 URL 或接口传入 `objectId`，复用问答能力 |
+| 后台管理员 / 测试人员 | 查看问答日志、用户反馈、失败问题、审核任务和统计结果 |
+
+## 3. 启动与访问
+
+### 3.1 启动后端
+
+在项目根目录打开终端：
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+启动后可访问：
 
 ```text
-http://127.0.0.1:8000/api
+后端接口文档：http://127.0.0.1:8000/docs
+健康检查：http://127.0.0.1:8000/api/health
 ```
 
-正式部署后由团队统一替换为服务器地址。
+说明：真实数据库、知识图谱和 LLM 配置存放在本地 `backend/.env` 中，不应提交到 GitHub。
 
----
+### 3.2 启动前端
 
-## 2. 用户反馈接口
-
-### 2.1 提交"有帮助"反馈
-
-当用户认为回答准确有用时调用。
-
-**请求：**
+另开一个终端：
 
 ```powershell
-Invoke-RestMethod -Uri http://127.0.0.1:8000/api/qa/feedback `
-  -Method Post `
-  -ContentType 'application/json' `
-  -Body '{"qaLogId":"5f5ef3f4-3c72-41f1-b48f-9e20e01c7e2a","feedbackType":"helpful","sourceClient":"web"}'
+cd frontend
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-**响应示例：**
+访问前端页面：
 
-```json
-{
-  "feedbackId": 1,
-  "qaLogId": "5f5ef3f4-3c72-41f1-b48f-9e20e01c7e2a",
-  "reviewTaskCreated": false,
-  "message": "反馈已记录。"
-}
+```text
+http://127.0.0.1:5173/qa
 ```
 
-### 2.2 提交"不准确"反馈
+从 Web 文物详情页集成跳转时，可以携带 `objectId`：
 
-当用户认为回答不准确时调用。系统会自动生成一条审核任务。
-
-**请求：**
-
-```powershell
-Invoke-RestMethod -Uri http://127.0.0.1:8000/api/qa/feedback `
-  -Method Post `
-  -ContentType 'application/json' `
-  -Body '{"qaLogId":"5f5ef3f4-3c72-41f1-b48f-9e20e01c7e2a","userId":1001,"feedbackType":"inaccurate","comment":"收藏博物馆名称有误。","sourceClient":"web"}'
+```text
+http://127.0.0.1:5173/qa?objectId=1
 ```
 
-**响应示例：**
+### 3.3 停止服务
 
-```json
-{
-  "feedbackId": 2,
-  "qaLogId": "5f5ef3f4-3c72-41f1-b48f-9e20e01c7e2a",
-  "reviewTaskCreated": true,
-  "message": "反馈已记录。"
-}
+在后端和前端终端分别按：
+
+```text
+Ctrl + C
 ```
 
-### 2.3 字段说明
+如果终端提示 `Terminate batch job (Y/N)?`，输入：
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `qaLogId` | string | 是 | 问答日志 UUID，来自 `/api/qa/ask` 响应的 `qaLogId` |
-| `userId` | number | 否 | 登录用户 ID（不传则匿名） |
-| `feedbackType` | string | 是 | `helpful`（有帮助）或 `inaccurate`（不准确） |
-| `comment` | string | 否 | 用户补充说明 |
-| `sourceClient` | string | 否 | 调用来源：`web` / `app` / `demo` |
-
-### 2.4 注意事项
-
-- `inaccurate` 反馈会自动在 `qa_review_task` 表生成一条 `pending` 状态的审核任务
-- `userId` 如果传入，必须在 `users` 表中存在（否则违反外键约束）
-- 未登录用户可以不传 `userId`，系统会记录为 NULL
-
----
-
-## 3. 后台管理接口
-
-### 3.1 通用查询参数
-
-所有列表查询接口支持以下通用参数：
-
-| 参数 | 类型 | 默认值 | 说明 |
-|---|---|---|---|
-| `page` | number | 1 | 页码，从 1 开始 |
-| `pageSize` | number | 20 | 每页数量，最大 100 |
-| `status` | string | — | 状态筛选 |
-| `keyword` | string | — | 关键词搜索 |
-| `startTime` | string | — | 开始时间（ISO 格式） |
-| `endTime` | string | — | 结束时间（ISO 格式） |
-
-### 3.2 通用响应格式
-
-```json
-{
-  "items": [ ... ],
-  "total": 50,
-  "page": 1,
-  "pageSize": 20,
-  "totalPages": 3
-}
+```text
+Y
 ```
 
-### 3.3 查询问答日志
+## 4. 前端页面说明
 
-```powershell
-# 基本分页
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/logs?page=1&pageSize=20"
+前端问答页面主要包括：
 
-# 按意图筛选
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/logs?intent=artifact_museum"
-
-# 按关键词搜索
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/logs?keyword=瓷器"
-
-# 按时间范围筛选
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/logs?startTime=2026-01-01&endTime=2026-05-25"
-```
-
-### 3.4 查询用户反馈
-
-```powershell
-# 全部反馈
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/feedback?page=1&pageSize=20"
-
-# 只看不准确反馈
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/feedback?feedbackType=inaccurate"
-```
-
-### 3.5 查询失败问题
-
-```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/failed-questions?page=1&pageSize=20"
-```
-
-### 3.6 查询审核任务
-
-```powershell
-# 全部审核任务
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/review-tasks?page=1&pageSize=20"
-
-# 只看待处理任务
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/review-tasks?taskStatus=pending"
-```
-
-### 3.7 处理审核任务
-
-**请求：**
-
-```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/review-tasks/1/review" `
-  -Method Post `
-  -ContentType 'application/json' `
-  -Body '{"reviewResult":"approved","reviewComment":"已确认，待补充数据。","reviewerId":2001}'
-```
-
-**`reviewResult` 取值：**
-
-| 值 | 含义 |
+| 区域 | 说明 |
 |---|---|
-| `approved` | 确认反馈有效，回答确实有问题 |
-| `rejected` | 反馈无效，回答正确 |
-| `fixed` | 已修正数据，问题已解决 |
+| 当前会话标识 | 页面顶部显示当前 `sessionId`，用于区分不同问答会话 |
+| 当前文物 `objectId` | 左侧输入框，可从 URL 自动读取，也可手动输入 |
+| 演示按钮 | 快速填入演示文物编号 |
+| 新会话按钮 | 清空当前文物上下文并生成新的 `sessionId` |
+| 示例问题 | 快速发起常用测试问题 |
+| 对话区 | 展示用户问题、系统回答、事实内容、补充说明、来源、候选文物、相关文物和反馈按钮 |
+| 输入框 | 用户输入自然语言问题并发送 |
 
-### 3.8 注意事项
+## 5. 基本问答使用方法
 
-- `reviewerId` 必须在 `admin_users` 表中存在
-- 审核后任务状态从 `pending` 变为 `done`
-- 审核结果不可撤回（如需修改需在数据库中手动处理）
+### 5.1 从文物详情页进入后提问
 
----
+1. 打开带 `objectId` 的问答页面，例如：
 
-## 4. 统计接口
-
-### 4.1 高频失败问题类型统计
-
-```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/statistics/failure-types"
+```text
+http://127.0.0.1:5173/qa?objectId=1
 ```
 
-响应示例：
+2. 确认左侧“当前文物 objectId”显示为 `1`。
+3. 在底部输入问题，例如：
+
+```text
+这件文物的材质是什么？
+```
+
+4. 点击“发送”。
+5. 查看系统返回的答案、事实内容、补充说明和数据来源。
+
+### 5.2 手动输入 `objectId` 后提问
+
+1. 在左侧“当前文物 objectId”输入文物编号，例如：
+
+```text
+1
+```
+
+2. 输入问题：
+
+```text
+这件文物收藏在哪里？
+```
+
+3. 点击“发送”。
+
+该方式适用于子系统单独演示，不依赖 Web 详情页。
+
+### 5.3 不知道 `objectId` 时通过文物名称提问
+
+如果用户不知道文物编号，可以直接在问题中输入文物名称：
+
+```text
+介绍一下犀牛角杯
+```
+
+如果系统识别到唯一文物，会自动解析到对应 `objectId` 并回答；如果识别到多个同名文物，会返回候选列表让用户选择。
+
+## 6. 支持的问题类型
+
+当前系统支持 11 类简单问答：
+
+| 问题类型 | 示例问题 |
+|---|---|
+| 文物收藏地 | 这件文物收藏在哪里？ |
+| 文物年代 | 这件文物属于哪个朝代？ |
+| 文物材质 | 这件文物的材质是什么？ |
+| 文物类型 | 这件文物是什么类型？ |
+| 文物介绍 | 介绍一下这件文物。 |
+| 书画作者 | 这件文物的作者是谁？ |
+| 作者生平 | 这个作者的生平是什么？ |
+| 同一作者作品 | 同一作者还有哪些作品？ |
+| 同一朝代文物 | 清朝有哪些代表性文物？ |
+| 文物尺寸与规格 | 这件文物的尺寸是多少？ |
+| 相关文物推荐 | 推荐一些相关文物。 |
+
+系统还支持基础复杂问答：
+
+| 问题类型 | 示例问题 |
+|---|---|
+| 博物馆收藏数量统计 | The Metropolitan Museum of Art 收藏了多少件中国文物？ |
+| 某类型收藏最多的博物馆 | 收藏容器最多的博物馆是哪个？ |
+| 博物馆所在城市 | The Metropolitan Museum of Art 位于哪个城市？ |
+| 朝代代表性文物 | 清朝有哪些代表性文物？ |
+
+当前不作为核心支持范围的问题包括：开放闲聊、天气查询、与文物文化无关的问题、复杂比较类问答、历史人物路径查询等。对于这些问题，系统会提示当前支持范围。
+
+## 7. 多候选文物选择
+
+当用户输入的文物名称对应多个文物时，系统会返回候选列表。例如：
+
+```text
+介绍一下花瓶
+```
+
+页面会展示前 10 个候选文物，每个候选可能包含：
+
+- 文物名称
+- `objectId`
+- 图片
+- 材质
+- 尺寸
+- 简介摘要
+- 馆藏博物馆
+- 朝代
+- 类型
+- 原始详情页链接
+
+使用方式：
+
+1. 根据候选卡片中的图片、馆藏、朝代、类型、材质、尺寸或详情页判断目标文物。
+2. 点击目标候选文物。
+3. 点击“确认选择并重新提问”。
+4. 系统会使用该候选的 `objectId` 回答原问题，并更新当前上下文。
+
+说明：系统不会在同名文物中随机选择，避免答错对象。
+
+## 8. 多轮对话
+
+系统使用 `sessionId` 保存当前会话的最近 5 轮上下文。用户可以在确认某件文物后继续追问：
+
+```text
+这件文物的材质是什么？
+它的尺寸是多少？
+它收藏在哪里？
+```
+
+其中“它”“该文物”“这件文物”等代词会指向当前会话中的文物。
+
+注意事项：
+
+- 点击“新会话”会清空当前上下文。
+- 如果问题中明确出现新的文物名称，系统会切换到新文物。
+- 如果请求或 URL 中传入新的 `objectId`，系统会优先使用新的 `objectId`，而不是旧上下文。
+- 当前会话上下文是内存基础版，服务重启后会清空；后续可持久化到 `qa_session`。
+
+## 9. 答案内容说明
+
+一条完整回答通常包含以下内容：
+
+| 字段 / 区域 | 说明 |
+|---|---|
+| 回答状态 | 如“已回答”“暂无数据”“需要确认”“暂不支持” |
+| 最终回答 | 面向用户的自然语言答案 |
+| 事实内容 `factContent` | 来自 MySQL 或 Neo4j 的事实依据 |
+| 补充说明 `supplementalContent` | 模板或 LLM 生成的辅助解释 |
+| 数据来源 `sources` | 标明答案来自 MySQL、Neo4j、LLM 或模板 |
+| 原始详情页链接 | 指向文物原始数据详情页 |
+| 相关文物推荐 | 展示与当前问题或文物相关的文物列表 |
+
+系统的可信问答规则：
+
+- 知识库有事实：返回事实内容与来源。
+- 知识库无事实：返回“暂无相关数据”或提示用户补充信息。
+- LLM 只用于补充说明，不作为唯一事实来源。
+- LLM 调用失败时，系统会回退到模板补充说明。
+
+## 10. 用户反馈
+
+每条可反馈的回答下方会显示：
+
+```text
+有帮助
+不准确
+```
+
+### 10.1 提交“有帮助”
+
+当用户认为回答正确、有参考价值时，点击“有帮助”。系统会记录一条反馈，用于统计回答质量。
+
+### 10.2 提交“不准确”
+
+当用户认为回答有误时，点击“不准确”。系统会：
+
+1. 记录用户反馈到 `qa_feedback`。
+2. 自动生成一条审核任务到 `qa_review_task`。
+3. 供后台管理员后续查看和处理。
+
+## 11. 后台管理使用方法
+
+后台管理功能目前通过 Swagger 接口页面使用：
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### 11.1 查看问答日志
+
+接口：
+
+```text
+GET /api/admin/qa/logs
+```
+
+常用参数：
+
+| 参数 | 说明 |
+|---|---|
+| `page` | 页码，默认 1 |
+| `pageSize` | 每页数量，默认 20，最大 100 |
+| `status` | 按回答状态筛选 |
+| `intent` | 按意图筛选 |
+| `keyword` | 按关键词搜索 |
+| `startTime` / `endTime` | 按时间范围筛选 |
+
+可用于查看用户问了什么、系统识别的意图、回答状态、关联文物和回答内容。
+
+### 11.2 查看用户反馈
+
+接口：
+
+```text
+GET /api/admin/qa/feedback
+```
+
+可通过 `feedbackType` 筛选：
+
+```text
+helpful
+inaccurate
+```
+
+### 11.3 查看失败问题
+
+接口：
+
+```text
+GET /api/admin/qa/failed-questions
+```
+
+可查看系统未能正常回答的问题，例如：
+
+- 无法确定文物对象
+- 知识库暂无数据
+- 问题类型暂不支持
+- 系统处理异常
+
+### 11.4 查看审核任务
+
+接口：
+
+```text
+GET /api/admin/qa/review-tasks
+```
+
+常用筛选：
+
+```text
+taskStatus=pending
+```
+
+用于查看用户点击“不准确”后生成的人工审核任务。
+
+### 11.5 处理审核任务
+
+接口：
+
+```text
+POST /api/admin/qa/review-tasks/{id}/review
+```
+
+请求体示例：
 
 ```json
-[
-  { "failureType": "no_data_found", "count": 42 },
-  { "failureType": "intent_not_recognized", "count": 15 }
-]
+{
+  "reviewResult": "rejected",
+  "reviewComment": "已核查，当前回答与知识库事实一致。",
+  "reviewerId": 1
+}
 ```
 
-按出现次数降序排列。
+`reviewResult` 常用取值：
 
-### 4.2 高频不准确问题类型统计
+| 值 | 说明 |
+|---|---|
+| `approved` | 用户反馈有效，回答确有问题 |
+| `rejected` | 用户反馈无效，回答无误 |
+| `fixed` | 问题已修复或数据已补充 |
 
-```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/admin/qa/statistics/inaccurate-types"
+### 11.6 查看统计结果
+
+高频失败问题类型：
+
+```text
+GET /api/admin/qa/statistics/failure-types
 ```
 
-响应示例：
+高频不准确问题类型：
+
+```text
+GET /api/admin/qa/statistics/inaccurate-types
+```
+
+这些统计结果可用于后续补充知识图谱、完善数据库字段和优化意图识别规则。
+
+## 12. 接口调用示例
+
+### 12.1 提问接口
+
+接口：
+
+```text
+POST /api/qa/ask
+```
+
+请求体：
 
 ```json
-[
-  { "intent": "artifact_museum", "count": 8 },
-  { "intent": "artifact_period", "count": 3 }
-]
+{
+  "question": "这件文物的材质是什么？",
+  "objectId": "1",
+  "sessionId": "qa-web-demo-session",
+  "sourceClient": "web"
+}
 ```
 
-按出现次数降序排列。
+响应中常见字段：
 
----
+| 字段 | 说明 |
+|---|---|
+| `qaLogId` | 本次问答日志 ID，反馈时使用 |
+| `sessionId` | 当前会话标识 |
+| `status` | 回答状态 |
+| `intent` | 识别出的问题意图 |
+| `answer` | 最终回答 |
+| `factContent` | 事实内容 |
+| `supplementalContent` | 补充说明 |
+| `resolvedObject` | 解析出的文物对象 |
+| `sources` | 数据来源 |
+| `relatedArtifacts` | 相关文物推荐 |
 
-## 5. 错误处理
+### 12.2 反馈接口
 
-| HTTP 状态码 | 含义 | 常见原因 |
-|---|---|---|
-| 200 | 成功 | |
-| 400 | 请求体解析错误 | JSON 格式错误 |
-| 404 | 资源不存在 | 审核任务 ID 不正确 |
-| 422 | 请求体验证失败 | 缺少必填字段、字段类型错误 |
-| 500 | 服务器内部错误 | 数据库连接异常等 |
+接口：
 
----
+```text
+POST /api/qa/feedback
+```
 
-## 6. 常见问题
+请求体：
 
-**Q: 提交反馈时返回 500 错误怎么办？**
+```json
+{
+  "qaLogId": "上一条回答返回的 qaLogId",
+  "feedbackType": "helpful",
+  "sourceClient": "web"
+}
+```
 
-A: 检查是否违反了数据库外键约束。`qaLogId` 必须是有效的 UUID，`userId` 如果在 `users` 表中不存在则传入 NULL。
+或：
 
-**Q: 为什么我提交了 inaccurate 反馈，但审核任务列表是空的？**
+```json
+{
+  "qaLogId": "上一条回答返回的 qaLogId",
+  "feedbackType": "inaccurate",
+  "comment": "回答内容与详情页不一致",
+  "sourceClient": "web"
+}
+```
 
-A: 审核任务列表需要按 `taskStatus` 参数筛选，默认只返回全部状态。如果是刚提交的反馈，任务状态为 `pending`，可用 `?taskStatus=pending` 查询。
+## 13. 推荐演示问题
 
-**Q: 统计接口返回空数组怎么办？**
+以下问题可用于系统演示或人工测试：
 
-A: 统计数据来自业务数据的积累，首次部署时无数据属于正常现象。待系统运行一段时间后数据会自动积累。
+```text
+打开 /qa?objectId=1
+
+这件文物收藏在哪里？
+这件文物属于哪个朝代？
+这件文物的材质是什么？
+这件文物是什么类型？
+这件文物的尺寸是多少？
+推荐一些相关文物
+```
+
+```text
+objectId 改为 5
+介绍一下这件文物
+```
+
+```text
+objectId 改为 2474
+这件文物的作者是谁？
+这个作者的生平是什么？
+```
+
+```text
+objectId 改为 2551
+同一作者还有哪些作品？
+```
+
+```text
+点击新会话
+介绍一下犀牛角杯
+```
+
+```text
+点击新会话
+介绍一下花瓶
+选择一个候选并确认
+```
+
+```text
+点击新会话，objectId 输入 1
+这件文物的材质是什么？
+它的尺寸是多少？
+它收藏在哪里？
+```
+
+```text
+The Metropolitan Museum of Art 收藏了多少件中国文物？
+收藏容器最多的博物馆是哪个？
+The Metropolitan Museum of Art 位于哪个城市？
+清朝有哪些代表性文物？
+```
+
+```text
+点击新会话，清空 objectId
+这件文物的材质是什么？
+今天天气怎么样？
+```
+
+## 14. 常见问题
+
+### Q1：为什么我问“这件文物的材质是什么？”时，系统提示补充文物名称？
+
+因为当前没有可用的 `objectId`，会话上下文中也没有当前文物。请从文物详情页进入问答页面，或手动输入 `objectId`，或在问题中写明文物名称。
+
+### Q2：为什么系统让我选择候选文物？
+
+因为输入的文物名称对应多个文物。系统为了避免答错对象，会展示候选列表，请选择目标文物后再继续提问。
+
+### Q3：为什么作者生平返回“暂无相关数据”？
+
+作者生平查询功能已经实现，但如果公共数据库中没有该作者的生平字段，系统会返回暂无数据，不会让 LLM 编造。
+
+### Q4：为什么有时补充说明不像大模型回答？
+
+LLM 是可选补充能力。如果没有配置 LLM、接口超时或调用失败，系统会自动回退到模板补充说明。事实内容仍以 MySQL 和 Neo4j 检索结果为准。
+
+### Q5：多轮上下文是否和用户账号绑定？
+
+当前基础版主要通过 `sessionId` 隔离会话，尚未强制绑定 `userId`。接口和数据库表已预留 `userId` 字段，后续与用户系统集成后可将会话持久化到 `qa_session`。
+
+### Q6：系统是否支持闲聊？
+
+当前系统专注文物知识问答，不是开放领域聊天机器人。对于天气、娱乐等无关问题，系统会提示支持范围并记录失败问题。
+
+### Q7：后台接口是否有权限控制？
+
+当前第 14 周子系统演示版本主要完成后台接口能力，尚未接入统一登录鉴权。正式集成时需要由后台管理系统增加权限控制和访问限制。
+
+## 15. 使用注意事项
+
+1. 不要将 `backend/.env` 中的数据库、Neo4j 或 LLM 密钥提交到 GitHub。
+2. 演示前确认后端、前端、MySQL、Neo4j 均可连接。
+3. 如果问题涉及具体文物，建议提供 `objectId` 或明确文物名称。
+4. 当系统返回“暂无相关数据”时，表示当前知识库没有可靠事实，不代表功能未实现。
+5. 当前多轮上下文为内存基础版，服务重启后上下文会丢失。
+6. 后台审核接口在正式系统中应增加管理员权限校验。
+
+## 16. 相关文档
+
+| 文档 | 路径 |
+|---|---|
+| API 文档 | `docs/api/qa-api.md` |
+| 数据库设计 | `docs/database/qa_tables_design.md` |
+| 项目管理计划 | `docs/project-plan/知识问答子系统项目管理计划-v0.4.md` |
+| 测试用例 | `docs/test/test-cases.md` |
+| 测试报告 | `docs/test/test-report.md` |
+| 后端说明 | `backend/README.md` |

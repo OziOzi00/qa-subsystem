@@ -1,0 +1,27 @@
+flowchart LR
+    User["用户在 App 提问"]
+    QA["知识问答子系统处理问答"]
+    Log["写入 qa_log<br/>question / answer / intent / status / object_id"]
+    Source["写入 qa_source_record<br/>source_type / fact_text / detail_url"]
+    Feedback["用户提交反馈<br/>qa_feedback"]
+    Review["不准确反馈生成<br/>qa_review_task"]
+    Failed["无法回答时记录<br/>qa_failed_question"]
+    AdminAPI["后台管理接口<br/>/api/admin/qa/*"]
+    Admin["后台管理子系统<br/>查看 / 审核 / 统计"]
+
+    User --> QA
+    QA --> Log
+    QA --> Source
+    QA --> Failed
+    User --> Feedback
+    Feedback --> Review
+
+    Log --> AdminAPI
+    Source --> AdminAPI
+    Feedback --> AdminAPI
+    Review --> AdminAPI
+    Failed --> AdminAPI
+
+    AdminAPI --> Admin
+
+    AdminAPI -. "GET /logs<br/>GET /feedback<br/>GET /failed-questions<br/>GET /review-tasks<br/>GET /statistics/*" .-> AdminAPI

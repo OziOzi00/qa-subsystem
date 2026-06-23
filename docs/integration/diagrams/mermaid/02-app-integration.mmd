@@ -1,0 +1,17 @@
+flowchart LR
+    A["用户进入 App 文物详情页"]
+    B["App 获取当前文物 objectId"]
+    C["用户输入问题 question<br/>或语音识别得到文本"]
+    D["App 调用问答接口<br/>POST /api/qa/ask"]
+    E["知识问答子系统处理<br/>意图识别 + 对象解析 + 知识检索"]
+    F["返回问答结果"]
+    G["App 展示答案、来源和推荐文物"]
+    H["用户点击<br/>有帮助 / 不准确"]
+    I["App 调用反馈接口<br/>POST /api/qa/feedback"]
+    J["问答系统记录反馈<br/>必要时生成审核任务"]
+
+    A --> B --> C --> D --> E --> F --> G --> H --> I --> J
+
+    D -. "请求字段：question、objectId、sessionId、userId、sourceClient=app" .-> D
+    F -. "返回字段：answer、factContent、supplementalContent、sources、relatedArtifacts、qaLogId" .-> F
+    I -. "反馈字段：qaLogId、feedbackType、comment、sourceClient=app" .-> I

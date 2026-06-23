@@ -1,0 +1,15 @@
+flowchart LR
+    KG["知识图谱构建子系统<br/>数据采集、清洗、建模"]
+    Graph["Neo4j 图数据库<br/>Artifact / Museum / Dynasty / Artist"]
+    Rel["图谱关系<br/>COLLECTED_BY / BELONGS_TO / CREATED_BY"]
+    QA["知识问答子系统<br/>接收 question + objectId / entities"]
+    Intent["意图识别<br/>artifact_museum / artifact_period / statistics_count 等"]
+    Cypher["Neo4j Driver 执行 Cypher 查询"]
+    Fact["返回图谱事实<br/>收藏地 / 年代 / 作者 / 推荐 / 统计"]
+    Answer["生成可信回答<br/>factContent + sources"]
+
+    KG --> Graph --> Rel --> QA --> Intent --> Cypher --> Fact --> Answer
+
+    Graph -. "统一标识：Artifact.object_id" .-> QA
+    QA -. "接口层统一使用 objectId" .-> Graph
+    Answer -. "sources.sourceType = neo4j" .-> Answer

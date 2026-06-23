@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#1f3b6d" flood-opacity="0.16"/>
+    </filter>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#16a34a"/>
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/>
+    </marker>
+    <style>
+      .title { font: 700 46px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #0b2f6b; }
+      .subtitle { font: 400 24px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #334155; }
+      .h { font: 700 30px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #102a5c; }
+      .label { font: 600 22px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #1e293b; }
+      .small { font: 400 19px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #475569; }
+      .tiny { font: 400 17px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #64748b; }
+      .badge { font: 700 20px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: white; }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="#f8fbff"/>
+  <path d="M0 820 C360 780 520 870 900 825 C1180 790 1360 750 1600 805 L1600 900 L0 900 Z" fill="#dbeafe"/>
+  <path d="M0 855 C360 820 560 905 960 860 C1210 830 1390 805 1600 835 L1600 900 L0 900 Z" fill="#2563eb" opacity="0.9"/>
+
+  <text x="70" y="82" class="title">知识问答子系统总体集成架构</text>
+  <text x="72" y="125" class="subtitle">向前服务 App 用户，向下对接 MySQL / Neo4j 数据，向后支撑后台管理与质量优化</text>
+
+  <rect x="55" y="215" width="230" height="330" rx="22" fill="#ecfdf5" stroke="#22c55e" stroke-width="2" filter="url(#shadow)"/>
+  <circle cx="170" cy="278" r="44" fill="#22c55e"/>
+  <text x="145" y="288" class="badge">App</text>
+  <text x="102" y="355" class="h" fill="#166534">App 子系统</text>
+  <text x="92" y="410" class="small">文物详情页</text>
+  <text x="92" y="452" class="small">语音 / 文本提问</text>
+  <text x="92" y="494" class="small">答案与来源展示</text>
+
+  <rect x="435" y="180" width="650" height="420" rx="28" fill="#eff6ff" stroke="#2563eb" stroke-width="3" filter="url(#shadow)"/>
+  <text x="645" y="232" class="h">知识问答子系统</text>
+  <text x="575" y="272" class="small">FastAPI 后端主流程：/api/qa/ask</text>
+
+  <g>
+    <rect x="485" y="320" width="112" height="145" rx="16" fill="white" stroke="#bfdbfe"/>
+    <circle cx="541" cy="350" r="18" fill="#2563eb"/><text x="535" y="357" class="badge">1</text>
+    <text x="504" y="418" class="label">意图识别</text>
+    <text x="500" y="448" class="tiny">Intent</text>
+  </g>
+  <g>
+    <rect x="620" y="320" width="112" height="145" rx="16" fill="white" stroke="#bfdbfe"/>
+    <circle cx="676" cy="350" r="18" fill="#2563eb"/><text x="670" y="357" class="badge">2</text>
+    <text x="639" y="406" class="label">对象解析</text>
+    <text x="638" y="436" class="tiny">objectId</text>
+  </g>
+  <g>
+    <rect x="755" y="320" width="112" height="145" rx="16" fill="white" stroke="#bfdbfe"/>
+    <circle cx="811" cy="350" r="18" fill="#2563eb"/><text x="805" y="357" class="badge">3</text>
+    <text x="774" y="406" class="label">知识检索</text>
+    <text x="770" y="436" class="tiny">MySQL + Neo4j</text>
+  </g>
+  <g>
+    <rect x="890" y="320" width="112" height="145" rx="16" fill="white" stroke="#bfdbfe"/>
+    <circle cx="946" cy="350" r="18" fill="#2563eb"/><text x="940" y="357" class="badge">4</text>
+    <text x="909" y="406" class="label">答案生成</text>
+    <text x="913" y="436" class="tiny">RAG 补充</text>
+  </g>
+  <g>
+    <rect x="680" y="492" width="160" height="70" rx="14" fill="#dbeafe" stroke="#93c5fd"/>
+    <text x="715" y="535" class="label">日志记录</text>
+  </g>
+  <path d="M598 392 L615 392" stroke="#2563eb" stroke-width="4" marker-end="url(#arrow-blue)"/>
+  <path d="M733 392 L750 392" stroke="#2563eb" stroke-width="4" marker-end="url(#arrow-blue)"/>
+  <path d="M868 392 L885 392" stroke="#2563eb" stroke-width="4" marker-end="url(#arrow-blue)"/>
+  <path d="M760 465 L760 486" stroke="#2563eb" stroke-width="4" marker-end="url(#arrow-blue)"/>
+
+  <rect x="385" y="660" width="340" height="150" rx="24" fill="#fff7ed" stroke="#f97316" stroke-width="2" filter="url(#shadow)"/>
+  <text x="505" y="705" class="h">MySQL</text>
+  <text x="430" y="750" class="small">文物基础信息、详情链接</text>
+  <text x="430" y="785" class="small">问答日志、反馈、审核任务</text>
+
+  <rect x="820" y="660" width="340" height="150" rx="24" fill="#f0fdf4" stroke="#16a34a" stroke-width="2" filter="url(#shadow)"/>
+  <text x="955" y="705" class="h">Neo4j</text>
+  <text x="865" y="750" class="small">文物、博物馆、朝代、作者</text>
+  <text x="865" y="785" class="small">收藏、年代、作者、推荐关系</text>
+
+  <rect x="1280" y="215" width="250" height="330" rx="22" fill="#faf5ff" stroke="#8b5cf6" stroke-width="2" filter="url(#shadow)"/>
+  <circle cx="1405" cy="278" r="44" fill="#8b5cf6"/>
+  <text x="1378" y="288" class="badge">Admin</text>
+  <text x="1322" y="355" class="h" fill="#5b21b6">后台管理</text>
+  <text x="1320" y="410" class="small">问答日志查看</text>
+  <text x="1320" y="452" class="small">反馈与审核任务</text>
+  <text x="1320" y="494" class="small">失败问题统计</text>
+
+  <path d="M286 350 L430 350" stroke="#16a34a" stroke-width="6" marker-end="url(#arrow-green)"/>
+  <text x="315" y="327" class="tiny">POST /api/qa/ask</text>
+  <path d="M430 430 L286 430" stroke="#16a34a" stroke-width="6" marker-end="url(#arrow-green)"/>
+  <text x="305" y="468" class="tiny">POST /api/qa/feedback</text>
+  <path d="M760 600 L640 655" stroke="#f97316" stroke-width="5" marker-end="url(#arrow-blue)"/>
+  <path d="M825 600 L920 655" stroke="#16a34a" stroke-width="5" marker-end="url(#arrow-green)"/>
+  <path d="M1088 390 L1275 390" stroke="#7c3aed" stroke-width="6" marker-end="url(#arrow-purple)"/>
+  <text x="1140" y="365" class="tiny">/api/admin/qa/*</text>
+
+  <rect x="70" y="728" width="245" height="84" rx="18" fill="white" stroke="#bfdbfe"/>
+  <text x="95" y="762" class="label">核心标识：objectId</text>
+  <text x="95" y="792" class="tiny">贯穿 App、MySQL、Neo4j、日志与反馈</text>
+</svg>

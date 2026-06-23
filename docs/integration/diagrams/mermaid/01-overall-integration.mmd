@@ -1,0 +1,21 @@
+flowchart LR
+    App["掌上博物馆 App<br/>用户提问 / 提交反馈"]
+    QA["知识问答子系统<br/>FastAPI 后端服务"]
+    MySQL["MySQL 公共数据库<br/>文物基础信息 / 问答日志 / 反馈审核"]
+    Neo4j["Neo4j 知识图谱<br/>文物-博物馆-朝代-作者关系"]
+    Admin["后台管理子系统<br/>日志查看 / 反馈审核 / 统计分析"]
+
+    App -- "POST /api/qa/ask<br/>question + objectId + sessionId" --> QA
+    QA -- "answer + factContent<br/>sources + relatedArtifacts" --> App
+
+    QA -- "objectId / intent" --> MySQL
+    QA -- "objectId / entities / intent" --> Neo4j
+
+    MySQL -- "材质、类型、介绍、尺寸、详情链接" --> QA
+    Neo4j -- "收藏地、年代、作者、推荐、统计" --> QA
+
+    App -- "POST /api/qa/feedback<br/>qaLogId + feedbackType" --> QA
+    QA -- "写入 qa_log / qa_feedback<br/>qa_failed_question / qa_review_task" --> MySQL
+
+    Admin -- "GET /api/admin/qa/*" --> QA
+    QA -- "日志、反馈、失败问题<br/>审核任务、统计结果" --> Admin
