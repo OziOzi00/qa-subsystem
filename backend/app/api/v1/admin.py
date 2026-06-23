@@ -1,9 +1,15 @@
+import asyncio
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
+
 from fastapi import APIRouter, HTTPException, Query
+from starlette.concurrency import run_in_threadpool
 
 from app.schemas.admin import PaginatedResponse, ReviewTaskActionRequest
 from app.services.admin_service import admin_service
 
 router = APIRouter()
+T = TypeVar("T")
 
 
 def _paginated(items: list[dict], total: int, page: int, page_size: int) -> PaginatedResponse:
@@ -14,6 +20,19 @@ def _paginated(items: list[dict], total: int, page: int, page_size: int) -> Pagi
         pageSize=page_size,
         totalPages=max(1, (total + page_size - 1) // page_size),
     )
+
+
+async def _run_admin_query(call: Callable[[], Awaitable[T]]) -> T:
+    """Run blocking MySQL admin queries outside the FastAPI event loop."""
+    try:
+        return await run_in_threadpool(lambda: asyncio.run(call()))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="后台问答管理数据源暂时不可用，请稍后重试。",
+        ) from exc
 
 
 @router.get("/admin/qa/logs", response_model=PaginatedResponse)
@@ -27,10 +46,12 @@ async def get_qa_logs(
     end_time: str | None = Query(None, alias="endTime"),
 ) -> PaginatedResponse:
     """Query QA logs with pagination and filters."""
-    items, total = await admin_service.query_logs(
-        page=page, page_size=page_size,
-        status=status, intent=intent, keyword=keyword,
-        start_time=start_time, end_time=end_time,
+    items, total = await _run_admin_query(
+        lambda: admin_service.query_logs(
+            page=page, page_size=page_size,
+            status=status, intent=intent, keyword=keyword,
+            start_time=start_time, end_time=end_time,
+        )
     )
     return _paginated(items, total, page, page_size)
 
@@ -43,9 +64,11 @@ async def get_feedback(
     keyword: str | None = Query(None),
 ) -> PaginatedResponse:
     """Query user feedback records with pagination."""
-    items, total = await admin_service.query_feedback(
-        page=page, page_size=page_size,
-        feedback_type=feedback_type, keyword=keyword,
+    items, total = await _run_admin_query(
+        lambda: admin_service.query_feedback(
+            page=page, page_size=page_size,
+            feedback_type=feedback_type, keyword=keyword,
+        )
     )
     return _paginated(items, total, page, page_size)
 
@@ -60,10 +83,12 @@ async def get_failed_questions(
     keyword: str | None = Query(None),
 ) -> PaginatedResponse:
     """Query failed questions with pagination and filters."""
-    items, total = await admin_service.query_failed_questions(
-        page=page, page_size=page_size,
-        failure_type=failure_type, status=status,
-        intent=intent, keyword=keyword,
+    items, total = await _run_admin_query(
+        lambda: admin_service.query_failed_questions(
+            page=page, page_size=page_size,
+            failure_type=failure_type, status=status,
+            intent=intent, keyword=keyword,
+        )
     )
     return _paginated(items, total, page, page_size)
 
@@ -76,9 +101,11 @@ async def get_review_tasks(
     review_result: str | None = Query(None, alias="reviewResult"),
 ) -> PaginatedResponse:
     """Query review tasks with pagination and filters."""
-    items, total = await admin_service.query_review_tasks(
-        page=page, page_size=page_size,
-        task_status=task_status, review_result=review_result,
+    items, total = await _run_admin_query(
+        lambda: admin_service.query_review_tasks(
+            page=page, page_size=page_size,
+            task_status=task_status, review_result=review_result,
+        )
     )
     return _paginated(items, total, page, page_size)
 
@@ -89,11 +116,13 @@ async def submit_review(
     payload: ReviewTaskActionRequest,
 ) -> dict:
     """Submit a review decision for a review task."""
-    success = await admin_service.review_task(
-        task_id=task_id,
-        review_result=payload.review_result,
-        review_comment=payload.review_comment,
-        reviewer_id=payload.reviewer_id,
+    success = await _run_admin_query(
+        lambda: admin_service.review_task(
+            task_id=task_id,
+            review_result=payload.review_result,
+            review_comment=payload.review_comment,
+            reviewer_id=payload.reviewer_id,
+        )
     )
     if not success:
         raise HTTPException(status_code=404, detail="审核任务不存在。")
@@ -107,10 +136,10 @@ async def submit_review(
 @router.get("/admin/qa/statistics/failure-types")
 async def get_failure_type_statistics() -> list[dict]:
     """Statistics: count failed questions grouped by failure type."""
-    return await admin_service.statistics_failure_types()
+    return await _run_admin_query(admin_service.statistics_failure_types)
 
 
 @router.get("/admin/qa/statistics/inaccurate-types")
 async def get_inaccurate_type_statistics() -> list[dict]:
     """Statistics: count inaccurate feedback grouped by question intent."""
-    return await admin_service.statistics_inaccurate_types()
+    return await _run_admin_query(admin_service.statistics_inaccurate_types)

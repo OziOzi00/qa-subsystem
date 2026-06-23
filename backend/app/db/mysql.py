@@ -79,6 +79,9 @@ def _pymysql_connection_factory(config: MySQLConfig) -> Any:
         charset=config.charset,
         cursorclass=DictCursor,
         autocommit=False,
+        connect_timeout=5,
+        read_timeout=10,
+        write_timeout=10,
     )
 
 
